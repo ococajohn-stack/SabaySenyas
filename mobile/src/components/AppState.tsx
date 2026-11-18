@@ -46,7 +46,7 @@ function displayNameFromEmail(email: string) {
   const prefix = email.split('@')[0]?.split('+')[0]?.replace(/[._-]+/g, ' ').trim();
   return prefix
     ? prefix.split(/\s+/).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
-    : 'Learner';
+    : 'Mag-aaral';
 }
 
 export function LearningProvider({ children }: { children: ReactNode }) {

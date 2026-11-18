@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.placeholder,
   },
   input: { flex: 1, color: colors.text, fontSize: 16 },
 });

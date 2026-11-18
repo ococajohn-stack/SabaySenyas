@@ -24,15 +24,15 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.greeting}>
-          <Text style={styles.eyebrow}>YOUR LEARNING SPACE</Text>
-          <Text style={styles.title}>Kumusta, {user?.name ?? 'Learner'}</Text>
-          <Text style={styles.subtitle}>Ready for today&apos;s FSL practice?</Text>
+          <Text style={styles.eyebrow}>ESPASYO MO SA PAG-AARAL</Text>
+          <Text style={styles.title}>Kumusta, {user?.name ?? 'Mag-aaral'}</Text>
+          <Text style={styles.subtitle}>Handa ka na bang magsanay ng FSL ngayong araw?</Text>
         </View>
 
         <View style={styles.searchGroup}>
           <SearchField
-            label="Search signs"
-            placeholder="Search signs..."
+            label="Maghanap ng mga senyas"
+            placeholder="Maghanap ng mga senyas..."
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={() => router.push('/dictionary')}
@@ -43,39 +43,39 @@ export default function HomeScreen() {
               <Text style={styles.resultMeaning}>{sign.meaning}</Text>
             </Pressable>
           ))}
-          {query.length > 0 && results.length === 0 ? <Text style={styles.noResults}>No matching signs.</Text> : null}
+          {query.length > 0 && results.length === 0 ? <Text style={styles.noResults}>Walang katugmang senyas.</Text> : null}
         </View>
         <View style={styles.card}>
           <View style={styles.sectionHeading}>
-            <Text style={styles.cardTitle}>Today&apos;s Lesson</Text>
-            <Text style={styles.tag}>UNIT 1</Text>
+            <Text style={styles.heroCardTitle}>Aralin Ngayong Araw</Text>
+            <Text style={styles.tag}>YUNIT 1</Text>
           </View>
-          <Text style={styles.lessonTitle}>Everyday Greetings</Text>
+          <Text style={styles.lessonTitle}>Mga Pang-araw-araw na Pagbati</Text>
           <SignVideo
             videoSource={featuredSign.videoSource}
             title={featuredSign.title}
             meaning={featuredSign.meaning}
             height={160}
           />
-          <PrimaryButton label="Start Lesson  →" onPress={() => router.push('/lesson')} />
+          <PrimaryButton label="Simulan ang Aralin  →" onPress={() => router.push('/lesson')} />
         </View>
 
         <View style={styles.sectionHeading}>
-          <Text style={styles.cardTitle}>Your Overview</Text>
-          <Pressable onPress={() => router.push('/progress')}><Text style={styles.link}>See all</Text></Pressable>
+          <Text style={styles.cardTitle}>Buod ng Iyong Pag-aaral</Text>
+          <Pressable onPress={() => router.push('/progress')}><Text style={styles.link}>Tingnan lahat</Text></Pressable>
         </View>
         <View style={styles.stats}>
-          <View style={styles.stat}><Text style={styles.statNum}>{lessonsCompleted}</Text><Text style={styles.statCaption}>lessons completed</Text></View>
-          <View style={styles.stat}><Text style={styles.statNum}>{String(streak).padStart(2, '0')}</Text><Text style={styles.statCaption}>day streak</Text></View>
+          <View style={styles.stat}><Text style={styles.statNum}>{lessonsCompleted}</Text><Text style={styles.statCaption}>natapos na aralin</Text></View>
+          <View style={styles.stat}><Text style={[styles.statNum, styles.streakNum]}>{String(streak).padStart(2, '0')}</Text><Text style={styles.statCaption}>sunod-sunod na araw</Text></View>
         </View>
 
         <View style={styles.drill}>
           <View style={styles.drillIcon}><Text style={styles.hand}>A</Text></View>
           <View style={styles.drillCopy}>
-            <Text style={styles.cardTitle}>Fingerspelling Drill</Text>
-            <Text style={styles.subtitle}>Practice the alphabet, one sign at a time.</Text>
+            <Text style={styles.cardTitle}>Pagsasanay sa Pagbaybay Gamit ang Daliri</Text>
+            <Text style={styles.subtitle}>Sanayin ang alpabeto, isang senyas sa bawat pagkakataon.</Text>
           </View>
-          <PrimaryButton label="Practice" onPress={() => router.push({ pathname: '/lesson', params: { unit: '1' } })} />
+          <PrimaryButton label="Magsanay" onPress={() => router.push({ pathname: '/lesson', params: { unit: '1' } })} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -90,19 +90,21 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '700', color: colors.text, letterSpacing: -0.5 },
   subtitle: { fontSize: 14, color: colors.muted },
   searchGroup: { gap: spacing.xs },
-  searchResult: { minHeight: 44, backgroundColor: colors.surface, borderRadius: radius.sm, paddingHorizontal: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  searchResult: { minHeight: 44, backgroundColor: colors.card, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   resultTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
   resultMeaning: { color: colors.muted, fontSize: 13 },
   noResults: { color: colors.muted, fontSize: 13, padding: spacing.sm },
-  card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.md },
+  card: { backgroundColor: colors.slate, borderRadius: radius.md, padding: spacing.md, gap: spacing.md, elevation: 2 },
   sectionHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
-  lessonTitle: { fontSize: 20, fontWeight: '700', color: colors.text, marginTop: -spacing.sm },
-  tag: { fontSize: 10, fontWeight: '700', color: colors.muted, letterSpacing: 1 },
+  heroCardTitle: { fontSize: 16, fontWeight: '600', color: colors.onPrimary },
+  lessonTitle: { fontSize: 20, fontWeight: '700', color: colors.onPrimary, marginTop: -spacing.sm },
+  tag: { fontSize: 10, fontWeight: '700', color: colors.accent, letterSpacing: 1 },
   link: { fontSize: 13, color: colors.muted, fontWeight: '600' },
   stats: { flexDirection: 'row', gap: spacing.sm },
-  stat: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
+  stat: { flex: 1, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs, elevation: 1 },
   statNum: { fontSize: 26, fontWeight: '700', color: colors.text },
+  streakNum: { color: colors.accent },
   statCaption: { fontSize: 12, color: colors.muted },
   drill: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   drillIcon: { width: 40, height: 40, borderRadius: radius.sm, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },

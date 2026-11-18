@@ -6,7 +6,7 @@ import { useLearningState } from "../../components/AppState";
 import PrimaryButton from "../../components/PrimaryButton";
 import { colors, MIN_TOUCH, radius, spacing } from "../../theme";
 
-const UNIT_TITLES = ["FSL Foundations", "Everyday Communication", "People & Places", "Daily Conversations"];
+const UNIT_TITLES = ["Mga Batayan ng FSL", "Pang-araw-araw na Pakikipag-usap", "Mga Tao at Lugar", "Araw-araw na Usapan"];
 const BASE_PROGRESS = [4, 4, 3, 3];
 const UNITS = [1, 2, 3, 4].map((n) => ({
   id: String(n),
@@ -26,22 +26,24 @@ export default function LessonsScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Lessons</Text>
-        <Text style={styles.subtitle}>
-          Build your Filipino Sign Language skills step by step.
-        </Text>
+        <View style={styles.hero}>
+          <Text style={styles.title}>Mga Aralin</Text>
+          <Text style={styles.subtitle}>
+            Linangin ang iyong kakayahan sa Wikang Pasenyas ng Pilipinas (FSL) nang paisa-isang hakbang.
+          </Text>
+        </View>
 
         <View style={styles.card}>
-          <Text style={styles.small}>Overall progress</Text>
-          <Text style={styles.bigText}>{lessonsCompleted} lessons completed</Text>
+          <Text style={styles.small}>Kabuuang progreso</Text>
+          <Text style={styles.bigText}>{lessonsCompleted} na aralin ang natapos</Text>
           <View style={styles.track}>
             <View style={[styles.fill, { width: `${Math.min(100, lessonsCompleted / 20 * 100)}%` }]} />
           </View>
         </View>
 
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Modules</Text>
-          <Text style={styles.small}>{completedUnits} of 4 units complete</Text>
+          <Text style={styles.sectionTitle}>Mga Yunit</Text>
+          <Text style={styles.small}>{completedUnits} sa 4 na yunit ang natapos</Text>
         </View>
 
         {UNITS.map((unit, index) => (
@@ -50,7 +52,7 @@ export default function LessonsScreen() {
             style={styles.row}
             onPress={() => router.push({ pathname: "/lesson", params: { unit: unit.id } })}
             accessibilityRole="button"
-            accessibilityLabel={`Unit ${unit.number}, ${unit.title}, ${unitProgress[index]} of 5 lessons`}
+            accessibilityLabel={`Yunit ${unit.number}, ${unit.title}, ${unitProgress[index]} sa 5 aralin`}
           >
             <View style={styles.number}>
               <Text style={styles.numberText}>{unit.number}</Text>
@@ -60,7 +62,7 @@ export default function LessonsScreen() {
                 <Text style={styles.rowTitle}>{unit.title}</Text>
                 <Ionicons name="chevron-forward" size={18} color={colors.muted} />
               </View>
-              <Text style={styles.rowSub}>{unitProgress[index]} of 5 lessons</Text>
+              <Text style={styles.rowSub}>{unitProgress[index]} sa 5 aralin</Text>
               <View style={styles.track}>
                 <View style={[styles.fill, { width: `${unitProgress[index] / 5 * 100}%` }]} />
               </View>
@@ -69,12 +71,12 @@ export default function LessonsScreen() {
         ))}
 
         <PrimaryButton
-          label="Practice All 9 Signs"
+          label="Sanayin ang Lahat ng 9 na Senyas"
           variant="secondary"
           onPress={() => router.push("/practice")}
         />
         <PrimaryButton
-          label="Resume Learning  →"
+          label="Ipagpatuloy ang Pag-aaral  →"
           onPress={() => router.push("/lesson")}
         />
       </ScrollView>
@@ -85,14 +87,18 @@ export default function LessonsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  title: { fontSize: 28, fontWeight: "700", color: colors.text },
-  subtitle: { fontSize: 14, color: colors.muted, marginBottom: spacing.sm },
+  hero: { backgroundColor: colors.slate, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs, elevation: 2 },
+  title: { fontSize: 28, fontWeight: "700", color: colors.onPrimary },
+  subtitle: { fontSize: 14, color: "#CBD5E1" },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
     gap: 8,
     marginBottom: spacing.sm,
+    elevation: 1,
   },
   small: { fontSize: 12, color: colors.muted },
   bigText: { fontSize: 18, fontWeight: "700", color: colors.text },
@@ -113,9 +119,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
+    elevation: 1,
   },
   number: {
     width: MIN_TOUCH,

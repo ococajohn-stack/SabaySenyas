@@ -24,23 +24,23 @@ const PREFERENCES: {
   title: string;
   description: string;
 }[] = [
-  { key: 'subtitlesByDefault', title: 'Subtitles (CC) by Default', description: 'Show sign captions when a video opens.' },
-  { key: 'hapticFeedback', title: 'Haptic Feedback', description: 'Feel a light vibration for button feedback.' },
-  { key: 'defaultSlowMotion', title: 'Default Slow-Motion (0.5x)', description: 'Start sign videos at a slower speed.' },
-  { key: 'voicePronunciation', title: 'Voice Pronunciation', description: 'Show spoken word pronunciation controls.' },
+  { key: 'subtitlesByDefault', title: 'Mga Teksto sa Bidyo Bilang Paunang Setting', description: 'Ipakita ang teksto ng senyas tuwing bubuksan ang bidyo.' },
+  { key: 'hapticFeedback', title: 'Panginginig Bilang Tugon', description: 'Maramdaman ang banayad na panginginig kapag pinindot ang mga pindutan.' },
+  { key: 'defaultSlowMotion', title: 'Mabagal na Galaw Bilang Paunang Setting (0.5x)', description: 'Simulan sa mas mabagal na bilis ang mga bidyo ng senyas.' },
+  { key: 'voicePronunciation', title: 'Pagbigkas Gamit ang Boses', description: 'Ipakita ang mga pindutan para mapakinggan ang pagbigkas ng salita.' },
 ];
 
 const ETIQUETTE_TIPS = [
-  { title: 'Keep visual attention', body: 'Face your conversation partner and maintain comfortable eye contact while signing.' },
-  { title: 'Use facial expressions', body: 'Facial expressions help communicate meaning and tone. Keep them natural and clear.' },
-  { title: 'Give your signing space', body: 'Keep your hands and upper body visible, with enough space to make each sign clearly.' },
+  { title: 'Panatilihin ang atensyon sa kausap', body: 'Humharap sa kausap at panatilihin ang komportableng pagtitig habang sumesenyas.' },
+  { title: 'Gumamit ng ekspresyon ng mukha', body: 'Nakakatulong ang ekspresyon ng mukha sa pagpapahayag ng kahulugan at tono. Panatilihin itong natural at malinaw.' },
+  { title: 'Maglaan ng sapat na espasyo sa pagsenyas', body: 'Panatilihing nakikita ang iyong mga kamay at itaas ng katawan, at tiyaking may sapat na puwang sa bawat senyas.' },
 ];
 
 function getInitials(name: string) {
   const words = name.trim().split(/\s+/).filter(Boolean);
   return words.length > 1
     ? `${words[0].charAt(0)}${words[words.length - 1].charAt(0)}`.toUpperCase()
-    : (words[0]?.slice(0, 2) ?? 'L').toUpperCase();
+    : (words[0]?.slice(0, 2) ?? 'M').toUpperCase();
 }
 
 function SettingRow({
@@ -84,14 +84,14 @@ export default function ProfileScreen() {
   const [name, setName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [error, setError] = useState('');
-  const displayName = user?.name ?? 'Learner';
-  const greetingIds = SIGNS.filter((sign) => sign.category === 'Greetings').map((sign) => sign.id);
+  const displayName = user?.name ?? 'Mag-aaral';
+  const greetingIds = SIGNS.filter((sign) => sign.category === 'Pagbati').map((sign) => sign.id);
 
   const badges = [
-    { title: 'First Sign', icon: 'hand-left-outline' as const, earned: learnedSignIds.length > 0 },
-    { title: 'Greetings Pro', icon: 'chatbubbles-outline' as const, earned: greetingIds.every((id) => learnedSignIds.includes(id)) },
-    { title: 'Quiz Starter', icon: 'school-outline' as const, earned: completedLessonIds.length > 0 },
-    { title: 'FSL Ally', icon: 'people-outline' as const, earned: learnedSignIds.length >= SIGNS.length },
+    { title: 'Unang Senyas', icon: 'hand-left-outline' as const, earned: learnedSignIds.length > 0 },
+    { title: 'Dalubhasa sa Pagbati', icon: 'chatbubbles-outline' as const, earned: greetingIds.every((id) => learnedSignIds.includes(id)) },
+    { title: 'Unang Pagsusulit', icon: 'school-outline' as const, earned: completedLessonIds.length > 0 },
+    { title: 'Kaagapay ng FSL', icon: 'people-outline' as const, earned: learnedSignIds.length >= SIGNS.length },
   ];
 
   const beginEditing = () => {
@@ -103,7 +103,7 @@ export default function ProfileScreen() {
 
   const saveProfile = () => {
     if (!name.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setError('Enter your full name and a valid email address.');
+      setError('Ilagay ang buong pangalan at wastong email address.');
       return;
     }
     updateProfile(name, email);
@@ -118,11 +118,11 @@ export default function ProfileScreen() {
 
   const confirmReset = () => {
     Alert.alert(
-      'Reset progress?',
-      'This clears learned signs, saved signs, completed lessons, and quiz progress. This cannot be undone.',
+      'Burahin ang progreso?',
+      'Mabubura rito ang mga natutuhan at itinabing senyas, mga natapos na aralin, at progreso sa pagsusulit. Hindi na ito maibabalik.',
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Reset Progress', style: 'destructive', onPress: resetProgress },
+        { text: 'Kanselahin', style: 'cancel' },
+        { text: 'Burahin ang Progreso', style: 'destructive', onPress: resetProgress },
       ],
     );
   };
@@ -140,29 +140,29 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.pageHeading}>
-          <Text style={styles.title}>Profile &amp; Settings</Text>
-          <Text style={styles.subtitle}>Your learning journey, your way.</Text>
+          <Text style={styles.title}>Aking Pahina</Text>
+          <Text style={styles.subtitle}>Ikaw ang may hawak sa takbo ng iyong pag-aaral.</Text>
         </View>
 
         <View style={styles.profileCard}>
           <View style={styles.profileTop}>
-            <View style={styles.avatar} accessibilityLabel={`${getInitials(displayName)} profile initials`}>
+            <View style={styles.avatar} accessibilityLabel={`${getInitials(displayName)} mga unang titik ng pangalan`}>
               <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
             </View>
             <View style={styles.profileInfo}>
               <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
-              <Text style={styles.email} numberOfLines={1}>{user?.email ?? 'Guest learner'}</Text>
+              <Text style={styles.email} numberOfLines={1}>{user?.email ?? 'Bisitang mag-aaral'}</Text>
               <View style={styles.levelPill}>
-                <Text style={styles.levelText}>FSL Beginner</Text>
+                <Text style={styles.levelText}>Baguhan sa FSL</Text>
               </View>
             </View>
           </View>
-          <PrimaryButton label="Edit Profile" variant="secondary" onPress={beginEditing} />
+          <PrimaryButton label="Baguhin ang Aking Pahina" variant="secondary" onPress={beginEditing} />
         </View>
 
         <View style={styles.sectionHeading}>
-          <Text style={styles.sectionTitle}>Achievements</Text>
-          <Text style={styles.sectionHint}>Earn badges as you learn</Text>
+          <Text style={styles.sectionTitle}>Mga Nakamit</Text>
+          <Text style={styles.sectionHint}>Makakuha ng mga sagisag habang nag-aaral</Text>
         </View>
         <View style={styles.badgesGrid}>
           {badges.map((badge) => (
@@ -171,13 +171,13 @@ export default function ProfileScreen() {
                 <Ionicons name={badge.icon} size={19} color={badge.earned ? colors.onPrimary : colors.muted} />
               </View>
               <Text style={[styles.badgeTitle, !badge.earned && styles.unearnedText]}>{badge.title}</Text>
-              <Text style={styles.badgeStatus}>{badge.earned ? 'Earned' : 'Keep learning'}</Text>
+              <Text style={styles.badgeStatus}>{badge.earned ? 'Nakamit' : 'Ipagpatuloy ang pag-aaral'}</Text>
             </View>
           ))}
         </View>
 
         <View style={styles.sectionHeading}>
-          <Text style={styles.sectionTitle}>Accessibility &amp; Learning</Text>
+          <Text style={styles.sectionTitle}>Kadalian sa Paggamit at Pag-aaral</Text>
         </View>
         <View style={styles.card}>
           {PREFERENCES.map((setting, index) => (
@@ -200,8 +200,8 @@ export default function ProfileScreen() {
           >
             <View style={styles.rowIcon}><Ionicons name="heart-outline" size={20} color={colors.text} /></View>
             <View style={styles.rowCopy}>
-              <Text style={styles.rowTitle}>FSL Etiquette &amp; Tips</Text>
-              <Text style={styles.rowSubtitle}>Helpful reminders for respectful communication</Text>
+              <Text style={styles.rowTitle}>Magalang na Pagsenyas at mga Paalala</Text>
+              <Text style={styles.rowSubtitle}>Mga paalala para sa magalang na pakikipag-usap</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.muted} />
           </Pressable>
@@ -210,10 +210,10 @@ export default function ProfileScreen() {
             <View style={styles.rowIcon}><Ionicons name="hand-left-outline" size={20} color={colors.text} /></View>
             <View style={styles.rowCopy}>
               <View style={styles.aboutHeading}>
-                <Text style={styles.rowTitle}>About SabaySenyas</Text>
+                <Text style={styles.rowTitle}>Tungkol sa SabaySenyas</Text>
                 <Text style={styles.version}>v1.0.0</Text>
               </View>
-              <Text style={styles.rowSubtitle}>Learn Filipino Sign Language through visual lessons, practice, and everyday signs.</Text>
+              <Text style={styles.rowSubtitle}>Matuto ng Wikang Pasenyas ng Pilipinas (FSL) sa pamamagitan ng mga aralin, pagsasanay, at pang-araw-araw na senyas.</Text>
             </View>
           </View>
         </View>
@@ -224,17 +224,17 @@ export default function ProfileScreen() {
           style={({ pressed }) => [styles.resetButton, pressed && styles.pressed]}
         >
           <Ionicons name="refresh-outline" size={18} color={colors.text} />
-          <Text style={styles.resetText}>Reset Progress</Text>
+          <Text style={styles.resetText}>Burahin ang Progreso</Text>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Log Out"
+          accessibilityLabel="Lumabas"
           onPress={handleLogOut}
           style={({ pressed }) => [styles.logOut, pressed && styles.pressed]}
         >
           <Ionicons name="log-out-outline" size={19} color={colors.danger} />
-          <Text style={styles.logOutText}>Log Out</Text>
+          <Text style={styles.logOutText}>Lumabas</Text>
         </Pressable>
       </ScrollView>
 
@@ -243,37 +243,37 @@ export default function ProfileScreen() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeading}>
               <View style={styles.modalTitleGroup}>
-                <Text style={styles.modalTitle}>Edit Profile</Text>
-                <Text style={styles.modalSubtitle}>Update your account details.</Text>
+                <Text style={styles.modalTitle}>Baguhin ang mga Detalye</Text>
+                <Text style={styles.modalSubtitle}>Baguhin ang mga detalye ng iyong pagkakakilanlan.</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Close Edit Profile"
+                accessibilityLabel="Isara ang pagbabago ng mga detalye"
                 onPress={() => setEditing(false)}
                 style={styles.closeButton}
               >
                 <Ionicons name="close" size={22} color={colors.text} />
               </Pressable>
             </View>
-            <Text style={styles.inputLabel}>Full Name</Text>
+            <Text style={styles.inputLabel}>Buong pangalan</Text>
             <TextInput
-              accessibilityLabel="Full Name"
+              accessibilityLabel="Buong pangalan"
               autoCapitalize="words"
               autoComplete="name"
-              placeholder="Your full name"
+              placeholder="Ilagay ang buong pangalan"
               placeholderTextColor={colors.muted}
               style={styles.input}
               value={name}
               onChangeText={(value) => { setName(value); setError(''); }}
               returnKeyType="next"
             />
-            <Text style={styles.inputLabel}>Email</Text>
+            <Text style={styles.inputLabel}>Adres ng email</Text>
             <TextInput
-              accessibilityLabel="Email"
+              accessibilityLabel="Adres ng email"
               autoCapitalize="none"
               autoComplete="email"
               keyboardType="email-address"
-              placeholder="you@example.com"
+              placeholder="halimbawa@halimbawa.ph"
               placeholderTextColor={colors.muted}
               style={styles.input}
               value={email}
@@ -282,8 +282,8 @@ export default function ProfileScreen() {
             />
             {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
             <View style={styles.modalActions}>
-              <PrimaryButton label="Save Changes" onPress={saveProfile} />
-              <PrimaryButton label="Cancel" variant="secondary" onPress={() => setEditing(false)} />
+              <PrimaryButton label="Itala ang mga Pagbabago" onPress={saveProfile} />
+              <PrimaryButton label="Kanselahin" variant="secondary" onPress={() => setEditing(false)} />
             </View>
           </View>
         </View>
@@ -294,12 +294,12 @@ export default function ProfileScreen() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeading}>
               <View style={styles.modalTitleGroup}>
-                <Text style={styles.modalTitle}>FSL Etiquette &amp; Tips</Text>
-                <Text style={styles.modalSubtitle}>Small habits that support clear communication.</Text>
+                <Text style={styles.modalTitle}>Magalang na Pagsenyas at mga Paalala</Text>
+                <Text style={styles.modalSubtitle}>Mga simpleng gawi para sa malinaw na pakikipag-usap.</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Close FSL Etiquette tips"
+                accessibilityLabel="Isara ang mga paalala sa pagsenyas"
                 onPress={() => setShowEtiquette(false)}
                 style={styles.closeButton}
               >
@@ -315,8 +315,8 @@ export default function ProfileScreen() {
                 </View>
               </View>
             ))}
-            <Text style={styles.disclaimer}>Sign preferences and conventions can vary. Follow the lead of the people you are communicating with.</Text>
-            <PrimaryButton label="Got It" onPress={() => setShowEtiquette(false)} />
+            <Text style={styles.disclaimer}>Maaaring mag-iba ang mga nakasanayang senyas. Sundin ang paraan ng mga taong kinakausap mo.</Text>
+            <PrimaryButton label="Nauunawaan Ko" onPress={() => setShowEtiquette(false)} />
           </View>
         </View>
       </Modal>
@@ -330,27 +330,27 @@ const styles = StyleSheet.create({
   pageHeading: { gap: spacing.xs, paddingVertical: spacing.xs },
   title: { fontSize: 28, fontWeight: '700', color: colors.text, letterSpacing: -0.5 },
   subtitle: { fontSize: 14, color: colors.muted },
-  profileCard: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.md },
+  profileCard: { backgroundColor: colors.slate, borderRadius: radius.md, padding: spacing.md, gap: spacing.md, elevation: 2 },
   profileTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   avatar: { width: 68, height: 68, borderRadius: radius.pill, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.onPrimary, fontSize: 23, fontWeight: '700' },
   profileInfo: { flex: 1, gap: spacing.xs },
-  name: { color: colors.text, fontSize: 20, fontWeight: '700' },
-  email: { color: colors.muted, fontSize: 14 },
-  levelPill: { alignSelf: 'flex-start', borderRadius: radius.pill, backgroundColor: colors.bg, paddingHorizontal: spacing.sm, paddingVertical: 5 },
-  levelText: { color: colors.text, fontSize: 11, fontWeight: '600' },
+  name: { color: colors.onPrimary, fontSize: 20, fontWeight: '700' },
+  email: { color: '#CBD5E1', fontSize: 14 },
+  levelPill: { alignSelf: 'flex-start', borderRadius: radius.pill, backgroundColor: colors.primary, paddingHorizontal: spacing.sm, paddingVertical: 5 },
+  levelText: { color: colors.onPrimary, fontSize: 11, fontWeight: '600' },
   sectionHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: spacing.xs },
   sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   sectionHint: { color: colors.muted, fontSize: 12 },
   badgesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  badgeCard: { width: '48%', minHeight: 112, flexGrow: 1, alignItems: 'flex-start', justifyContent: 'center', gap: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.sm },
-  badgeCardEarned: { backgroundColor: colors.surface, borderColor: colors.primary },
+  badgeCard: { width: '48%', minHeight: 112, flexGrow: 1, alignItems: 'flex-start', justifyContent: 'center', gap: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.sm, backgroundColor: colors.card },
+  badgeCardEarned: { backgroundColor: colors.card, borderColor: colors.accent },
   badgeIcon: { width: 34, height: 34, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  badgeIconEarned: { backgroundColor: colors.primary },
+  badgeIconEarned: { backgroundColor: colors.accent },
   badgeTitle: { color: colors.text, fontSize: 13, fontWeight: '700' },
   unearnedText: { color: colors.muted },
   badgeStatus: { color: colors.muted, fontSize: 11 },
-  card: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md },
+  card: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, elevation: 1 },
   settingRow: { minHeight: 76, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.sm },
   settingCopy: { flex: 1, gap: 3 },
   settingTitle: { color: colors.text, fontSize: 14, fontWeight: '600' },
@@ -377,11 +377,11 @@ const styles = StyleSheet.create({
   modalSubtitle: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   closeButton: { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center', marginTop: -spacing.xs, marginRight: -spacing.xs },
   inputLabel: { color: colors.text, fontSize: 13, fontWeight: '600', marginBottom: -spacing.sm },
-  input: { minHeight: 52, borderRadius: radius.md, backgroundColor: colors.surface, paddingHorizontal: spacing.md, color: colors.text, fontSize: 16 },
+  input: { minHeight: 52, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, color: colors.text, fontSize: 16 },
   error: { color: colors.danger, fontSize: 13 },
   modalActions: { gap: spacing.sm, marginTop: spacing.xs },
   tipRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
-  tipNumber: { width: 28, height: 28, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  tipNumber: { width: 28, height: 28, borderRadius: radius.pill, backgroundColor: colors.chip, alignItems: 'center', justifyContent: 'center' },
   tipNumberText: { color: colors.text, fontSize: 12, fontWeight: '700' },
   tipCopy: { flex: 1, gap: spacing.xs },
   tipTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },

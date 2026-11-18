@@ -3,9 +3,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius } from '../theme';
 
 // Stand-in for the sign video until real clips are added.
-export default function VideoPlaceholder({ height = 200, label = 'Video' }: { height?: number; label?: string }) {
+export default function VideoPlaceholder({ height = 200, label = 'Bidyo' }: { height?: number; label?: string }) {
   return (
-    <View style={[styles.box, { height }]} accessibilityLabel={`${label} placeholder`}>
+    <View style={[styles.box, { height }]} accessibilityLabel={`${label} na pamalit`}>
       <View style={styles.play}>
         <Ionicons name="play" size={22} color={colors.onPrimary} />
       </View>

@@ -38,7 +38,7 @@ export default function PrimaryButton({ label, onPress, variant = 'primary', fle
 const styles = StyleSheet.create({
   base: { minHeight: MIN_TOUCH, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.surface },
+  secondary: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   disabled: { opacity: 0.6 },
   label: { fontSize: 16, fontWeight: '600' },
 });

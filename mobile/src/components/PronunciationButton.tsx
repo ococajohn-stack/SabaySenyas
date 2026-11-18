@@ -16,15 +16,15 @@ export default function PronunciationButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Listen to ${title} pronunciation`}
+      accessibilityLabel={`Pakinggan ang pagbigkas ng ${title}`}
       style={styles.button}
       onPress={() => {
-        Speech.speak(`${title}. ${meaning}`, { rate: 0.9 });
+        Speech.speak(`${title}. ${meaning}`, { language: 'fil-PH', rate: 0.9 });
         triggerHapticFeedback();
       }}
     >
-      <Ionicons name="volume-medium-outline" size={21} color={colors.text} />
-      <Text style={styles.label}>Listen</Text>
+      <Ionicons name="volume-medium-outline" size={21} color={colors.primary} />
+      <Text style={styles.label}>Pakinggan</Text>
     </Pressable>
   );
 }

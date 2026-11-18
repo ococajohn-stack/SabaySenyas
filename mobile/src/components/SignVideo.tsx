@@ -63,7 +63,7 @@ export default function SignVideo({
         style={styles.speedButton}
         onPress={togglePlaybackRate}
         accessibilityRole="button"
-        accessibilityLabel={`Playback speed ${playbackRate} times`}
+        accessibilityLabel={`Bilis ng bidyo: ${playbackRate} ulit`}
       >
         <Text style={styles.ccText}>{playbackRate === 1 ? '1x' : '0.5x'}</Text>
       </Pressable>
@@ -74,10 +74,10 @@ export default function SignVideo({
           triggerHapticFeedback();
         }}
         accessibilityRole="button"
-        accessibilityLabel={`Captions ${captionsEnabled ? 'on' : 'off'}`}
+        accessibilityLabel={captionsEnabled ? 'Itago ang paliwanag' : 'Ipakita ang paliwanag'}
         accessibilityState={{ selected: captionsEnabled }}
       >
-        <Text style={styles.ccText}>CC</Text>
+        <Text style={styles.ccText}>{captionsEnabled ? 'Itago' : 'Ipakita'}</Text>
       </Pressable>
       {preferences.voicePronunciation ? (
         <View style={styles.listenButton}>

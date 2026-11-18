@@ -60,7 +60,7 @@ export default function PracticeScreen() {
       <CameraView style={styles.camera} facing="front" />
       <View pointerEvents="none" style={styles.alignmentOverlay}>
         <View style={styles.alignmentFrame}>
-          <Text style={styles.alignmentText}>Keep your upper body and hands in frame</Text>
+          <Text style={styles.alignmentText}>Panatilihing kita sa kuha ang itaas ng katawan at mga kamay</Text>
         </View>
       </View>
       {countdown !== null ? (
@@ -72,14 +72,14 @@ export default function PracticeScreen() {
   ) : (
     <View style={styles.permissionCard}>
       <Ionicons name="camera-outline" size={32} color={colors.text} />
-      <Text style={styles.cardTitle}>Camera access needed</Text>
+      <Text style={styles.cardTitle}>Kailangan ng pahintulot sa kamera</Text>
       <Text style={styles.body}>
-        Allow camera access to see yourself while practicing. Your camera preview is not recorded.
+        Payagan ang paggamit ng kamera upang makita mo ang sarili habang nagsasanay. Hindi nire-record ang nakikita ng kamera.
       </Text>
       {permission?.canAskAgain === false ? (
-        <Text style={styles.body}>Camera access was denied. Enable it in your device settings to continue.</Text>
+        <Text style={styles.body}>Tinanggihan ang pahintulot sa kamera. Paganahin ito sa mga setting ng iyong aparato upang magpatuloy.</Text>
       ) : null}
-      <PrimaryButton label="Allow Camera" onPress={requestPermission} />
+      <PrimaryButton label="Payagan ang Kamera" onPress={requestPermission} />
     </View>
   );
 
@@ -90,7 +90,7 @@ export default function PracticeScreen() {
           style={styles.back}
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel="Bumalik"
         >
           <Ionicons name="arrow-back" size={21} color={colors.text} />
         </Pressable>
@@ -100,13 +100,13 @@ export default function PracticeScreen() {
             <View style={styles.completeIcon}>
               <Ionicons name="checkmark" size={28} color={colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Practice complete!</Text>
+            <Text style={styles.title}>Tapos na ang Pagsasanay!</Text>
             <Text style={styles.body}>
-              You confirmed all {SIGNS.length} signs. Your learned-sign progress has been updated.
+              Nakumpirma mo ang lahat ng {SIGNS.length} na senyas. Na-update na ang talaan ng mga natutuhan mo.
             </Text>
-            <Text style={styles.score}>Score: {score} / {SIGNS.length}</Text>
-            <PrimaryButton label="Back to Lessons" onPress={() => router.replace('/lessons')} />
-            <PrimaryButton label="Practice Again" variant="secondary" onPress={() => {
+            <Text style={styles.score}>Iskor: {score} / {SIGNS.length}</Text>
+            <PrimaryButton label="Bumalik sa mga Aralin" onPress={() => router.replace('/lessons')} />
+            <PrimaryButton label="Magsanay Muli" variant="secondary" onPress={() => {
               setSignIndex(0);
               setScore(0);
               setCountdown(null);
@@ -118,11 +118,11 @@ export default function PracticeScreen() {
           <>
             <View style={styles.heading}>
               <View style={styles.headingCopy}>
-                <Text style={styles.eyebrow}>SHOW THE SIGN</Text>
-                <Text style={styles.title}>Perform the sign for: {sign.title}</Text>
+                <Text style={styles.eyebrow}>IPAKITA ANG SENYAS</Text>
+                <Text style={styles.title}>Gawin ang senyas para sa: {sign.title}</Text>
                 <Text style={styles.meaning}>{sign.meaning}</Text>
               </View>
-              <Text style={styles.score}>Score: {score} / {SIGNS.length}</Text>
+              <Text style={styles.score}>Iskor: {score} / {SIGNS.length}</Text>
             </View>
 
             <View
@@ -132,7 +132,7 @@ export default function PracticeScreen() {
             >
               <View style={[styles.fill, { width: `${((signIndex + 1) / SIGNS.length) * 100}%` }]} />
             </View>
-            <Text style={styles.progress}>Sign {signIndex + 1} of {SIGNS.length}</Text>
+            <Text style={styles.progress}>Senyas {signIndex + 1} sa {SIGNS.length}</Text>
 
             <Pressable
               style={styles.referenceToggle}
@@ -140,7 +140,7 @@ export default function PracticeScreen() {
               accessibilityRole="button"
               accessibilityState={{ expanded: referenceVisible }}
             >
-              <Text style={styles.cardTitle}>Reference Video</Text>
+              <Text style={styles.cardTitle}>Bidyo Bilang Halimbawa</Text>
               <Ionicons
                 name={referenceVisible ? 'chevron-up' : 'chevron-down'}
                 size={20}
@@ -151,7 +151,7 @@ export default function PracticeScreen() {
               <View style={styles.comparison}>
                 {cameraPreview}
                 <View style={styles.referencePanel}>
-                  <Text style={styles.referenceLabel}>Reference</Text>
+                  <Text style={styles.referenceLabel}>Halimbawa</Text>
                   <SignVideo
                     videoSource={sign.videoSource}
                     title={sign.title}
@@ -167,19 +167,19 @@ export default function PracticeScreen() {
             {permission?.granted ? (
               gestureReady ? (
                 <View style={styles.actions}>
-                  <PrimaryButton label="I Performed It" onPress={confirmGesture} />
-                  <PrimaryButton label="Try Again" variant="secondary" onPress={startCountdown} />
+                  <PrimaryButton label="Nagawa Ko Ito" onPress={confirmGesture} />
+                  <PrimaryButton label="Subukan Muli" variant="secondary" onPress={startCountdown} />
                 </View>
               ) : (
                 <PrimaryButton
-                  label={countdown === null ? 'Perform Gesture' : `Starting in ${countdown}...`}
+                  label={countdown === null ? 'Gawin ang Senyas' : `Magsisimula sa ${countdown}...`}
                   onPress={startCountdown}
                   disabled={countdown !== null}
                 />
               )
             ) : null}
             <Text style={styles.disclaimer}>
-              Your score is based on your self-check; the camera does not evaluate gestures.
+              Batay sa sarili mong pagsusuri ang iskor; hindi sinusuri ng kamera ang mga senyas.
             </Text>
           </>
         )}
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.28)',
   },
   countdownText: { color: '#fff', fontSize: 72, fontWeight: '700' },
-  permissionCard: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.surface, borderRadius: radius.md },
+  permissionCard: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, elevation: 1 },
   cardTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
   body: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   referenceToggle: {
@@ -257,7 +257,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    elevation: 1,
   },
   actions: { gap: spacing.sm },
   disclaimer: { color: colors.muted, fontSize: 12, textAlign: 'center' },

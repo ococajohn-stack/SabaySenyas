@@ -10,9 +10,9 @@ import { SIGNS } from '../data/signs';
 import { colors, radius, spacing } from '../theme';
 
 const QUESTIONS = [
-  { prompt: 'Which sign means “Thank you”?', signId: '2', options: ['Salamat', 'Kumusta', 'Paalam', 'Ingat'], answer: 0 },
-  { prompt: 'Which sign means “Hello / How are you?”', signId: '1', options: ['Tatay', 'Kumusta', 'Dalawa', 'Salamat'], answer: 1 },
-  { prompt: 'Which sign means “Goodbye”?', signId: '4', options: ['Ingat', 'Nanay', 'Paalam', 'Isa'], answer: 2 },
+  { prompt: 'Aling senyas ang nangangahulugang pagpapasalamat?', signId: '2', options: ['Salamat', 'Kumusta', 'Paalam', 'Ingat'], answer: 0 },
+  { prompt: 'Aling senyas ang ginagamit sa pagbati o pagtatanong kung ayos ang isang tao?', signId: '1', options: ['Tatay', 'Kumusta', 'Dalawa', 'Salamat'], answer: 1 },
+  { prompt: 'Aling senyas ang ginagamit kapag nagpapaalam?', signId: '4', options: ['Ingat', 'Nanay', 'Paalam', 'Isa'], answer: 2 },
 ];
 
 export default function QuizScreen() {
@@ -32,11 +32,11 @@ export default function QuizScreen() {
 
   const checkAnswer = () => {
     if (selected === null) {
-      setFeedback('Choose an answer before checking.');
+      setFeedback('Pumili muna ng sagot bago ito tiyakin.');
       return;
     }
     if (selected !== question.answer) {
-      setFeedback('Not quite. Try another answer.');
+      setFeedback('Hindi pa tama. Subukan ang ibang sagot.');
       return;
     }
     if (questionIndex < QUESTIONS.length - 1) {
@@ -47,24 +47,24 @@ export default function QuizScreen() {
     }
     completeLesson(`unit-${unit}-lesson-1`);
     setCompleted(true);
-    setFeedback('Great work! You completed this lesson.');
+    setFeedback('Magaling! Natapos mo ang araling ito.');
   };
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.eyebrow}>UNIT {unit} · QUICK REVIEW</Text>
+        <Text style={styles.eyebrow}>YUNIT {unit} · MAIKLING PAGBABALIK-ARAL</Text>
         {completed ? (
           <View style={styles.complete}>
             <View style={styles.completeIcon}><Ionicons name="checkmark" size={28} color={colors.onPrimary} /></View>
-            <Text style={styles.title}>Lesson complete</Text>
+            <Text style={styles.title}>Tapos na ang Aralin</Text>
             <Text style={styles.subtitle}>{feedback}</Text>
-            <PrimaryButton label="Back to Lessons" onPress={() => router.replace('/lessons')} />
+            <PrimaryButton label="Bumalik sa mga Aralin" onPress={() => router.replace('/lessons')} />
           </View>
         ) : (
           <>
             <View style={styles.progressHeading}>
-              <Text style={styles.title}>Knowledge Check</Text>
+              <Text style={styles.title}>Pagsusulit</Text>
               <Text style={styles.count}>{questionIndex + 1} / {QUESTIONS.length}</Text>
             </View>
             <View style={styles.track} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: QUESTIONS.length, now: questionIndex + 1 }}>
@@ -99,7 +99,7 @@ export default function QuizScreen() {
               })}
             </View>
             {feedback ? <Text accessibilityLiveRegion="polite" style={styles.feedback}>{feedback}</Text> : null}
-            <PrimaryButton label="Check" onPress={checkAnswer} />
+            <PrimaryButton label="Tiyakin ang Sagot" onPress={checkAnswer} />
           </>
         )}
       </ScrollView>
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   fill: { height: 7, backgroundColor: colors.primary },
   prompt: { color: colors.text, fontSize: 19, fontWeight: '600', lineHeight: 26 },
   options: { gap: spacing.sm },
-  option: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md },
+  option: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, elevation: 1 },
   optionActive: { borderColor: colors.primary },
   radio: { width: 20, height: 20, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.muted, alignItems: 'center', justifyContent: 'center' },
   radioActive: { borderColor: colors.primary },

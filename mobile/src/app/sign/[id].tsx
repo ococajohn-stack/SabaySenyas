@@ -19,8 +19,8 @@ export default function SignDetailScreen() {
     return (
       <SafeAreaView style={styles.screen}>
         <View style={styles.center}>
-          <Text style={styles.empty}>This sign could not be found.</Text>
-          <PrimaryButton label="Back to dictionary" onPress={() => router.back()} />
+          <Text style={styles.empty}>Hindi makita ang senyas na ito.</Text>
+          <PrimaryButton label="Bumalik sa diksiyonaryo" onPress={() => router.back()} />
         </View>
       </SafeAreaView>
     );
@@ -32,7 +32,7 @@ export default function SignDetailScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.kicker}>SIGN DICTIONARY</Text>
+        <Text style={styles.kicker}>DIKSIYONARYO NG MGA SENYAS</Text>
         <SignVideo
           videoSource={sign.videoSource}
           title={sign.title}
@@ -42,7 +42,7 @@ export default function SignDetailScreen() {
 
         <View style={styles.card}>
           <View style={styles.vocabularyHeading}>
-            <Text style={styles.small}>SIGN VOCABULARY</Text>
+            <Text style={styles.small}>TALASALITAAN NG MGA SENYAS</Text>
           </View>
           <Text style={styles.word}>{sign.title}</Text>
           <Text style={styles.meaning}>{sign.meaning}</Text>
@@ -50,20 +50,20 @@ export default function SignDetailScreen() {
 
         <View style={styles.instructionCard}>
           <View style={styles.row}>
-            <Text style={styles.cardTitle}>Movement &amp; Handshape</Text>
+            <Text style={styles.cardTitle}>Galaw at Hugis ng Kamay</Text>
           </View>
           <Text style={styles.body}>{sign.description}</Text>
         </View>
 
         <View style={styles.actions}>
           <PrimaryButton
-            label={saved ? 'Saved' : 'Save'}
+            label={saved ? 'Naitabi na' : 'Itabi'}
             variant="secondary"
             flex
             onPress={() => toggleSavedSign(sign.id)}
           />
           <PrimaryButton
-            label={next ? 'Next  →' : 'Done'}
+            label={next ? 'Susunod  →' : 'Tapos na'}
             flex
             onPress={() => (next ? router.replace(`/sign/${next.id}`) : router.back())}
           />
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, gap: spacing.md },
   empty: { fontSize: 16, color: colors.muted },
   kicker: { fontSize: 11, color: colors.muted, fontWeight: '600', letterSpacing: 1 },
-  card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: 4 },
+  card: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: 4, elevation: 1 },
   vocabularyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   small: { fontSize: 11, color: colors.muted, fontWeight: '600', letterSpacing: 1 },
   word: { fontSize: 24, fontWeight: '700', color: colors.text },
@@ -87,6 +87,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   cardTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
   body: { fontSize: 14, color: colors.text, lineHeight: 20 },
-  instructionCard: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
+  instructionCard: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm, elevation: 1 },
   actions: { flexDirection: 'row', gap: spacing.sm },
 });
