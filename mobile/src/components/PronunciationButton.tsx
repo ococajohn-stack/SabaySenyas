@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { useSettingsState } from './AppState';
-import { colors, MIN_TOUCH, spacing } from '../theme';
+import { colors, MIN_TOUCH } from '../theme';
 
 export default function PronunciationButton({
   title,
@@ -16,28 +16,25 @@ export default function PronunciationButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Pakinggan ang pagbigkas ng ${title}`}
+      accessibilityLabel={`Pakinggan ang bigkas ng ${title}`}
       style={styles.button}
       onPress={() => {
         Speech.speak(`${title}. ${meaning}`, { language: 'fil-PH', rate: 0.9 });
         triggerHapticFeedback();
       }}
     >
-      <Ionicons name="volume-medium-outline" size={21} color={colors.primary} />
-      <Text style={styles.label}>Pakinggan</Text>
+      <Ionicons name="volume-high" size={22} color={colors.primary} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    minWidth: MIN_TOUCH,
+    width: MIN_TOUCH,
     height: MIN_TOUCH,
-    flexDirection: 'row',
-    gap: spacing.xs,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
+    borderRadius: MIN_TOUCH / 2,
+    backgroundColor: '#CCFBF1',
   },
-  label: { color: colors.text, fontSize: 13, fontWeight: '700' },
 });

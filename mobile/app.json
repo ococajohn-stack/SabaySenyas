@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "SabaySenyas",
+    "slug": "sabaysenyas",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "sabaysenyas",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"

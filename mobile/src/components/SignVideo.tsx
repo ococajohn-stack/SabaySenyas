@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView, type VideoPlayer, type VideoSource } from 'expo-video';
 import { useSettingsState } from './AppState';
-import PronunciationButton from './PronunciationButton';
 import { radius, spacing } from '../theme';
 
 function setPlayerPlaybackRate(player: VideoPlayer, playbackRate: number) {
@@ -79,11 +78,6 @@ export default function SignVideo({
       >
         <Text style={styles.ccText}>{captionsEnabled ? 'Itago' : 'Ipakita'}</Text>
       </Pressable>
-      {preferences.voicePronunciation ? (
-        <View style={styles.listenButton}>
-          <PronunciationButton title={title} meaning={meaning} />
-        </View>
-      ) : null}
       {captionsEnabled ? (
         <View style={styles.subtitle} accessibilityLabel={`${title}: ${meaning}`}>
           <Text style={styles.title}>{title}</Text>
@@ -124,14 +118,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.pill,
     backgroundColor: 'rgba(0, 0, 0, 0.72)',
-  },
-  listenButton: {
-    position: 'absolute',
-    top: spacing.sm,
-    left: '50%',
-    transform: [{ translateX: -40 }],
-    borderRadius: radius.pill,
-    backgroundColor: '#fff',
   },
   ccText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   subtitle: {

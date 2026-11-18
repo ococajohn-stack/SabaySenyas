@@ -3,6 +3,7 @@ import { useLearningState } from '../../components/AppState';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PrimaryButton from '../../components/PrimaryButton';
+import PronunciationButton from '../../components/PronunciationButton';
 import SignVideo from '../../components/SignVideo';
 import { SIGNS } from '../../data/signs';
 import { colors, radius, spacing } from '../../theme';
@@ -42,9 +43,12 @@ export default function SignDetailScreen() {
 
         <View style={styles.card}>
           <View style={styles.vocabularyHeading}>
-            <Text style={styles.small}>TALASALITAAN NG MGA SENYAS</Text>
+            <View style={styles.wordCopy}>
+              <Text style={styles.small}>TALASALITAAN NG MGA SENYAS</Text>
+              <Text style={styles.word}>{sign.title}</Text>
+            </View>
+            <PronunciationButton title={sign.title} meaning={sign.meaning} />
           </View>
-          <Text style={styles.word}>{sign.title}</Text>
           <Text style={styles.meaning}>{sign.meaning}</Text>
         </View>
 
@@ -80,7 +84,8 @@ const styles = StyleSheet.create({
   empty: { fontSize: 16, color: colors.muted },
   kicker: { fontSize: 11, color: colors.muted, fontWeight: '600', letterSpacing: 1 },
   card: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: 4, elevation: 1 },
-  vocabularyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  vocabularyHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  wordCopy: { flex: 1, gap: spacing.xs },
   small: { fontSize: 11, color: colors.muted, fontWeight: '600', letterSpacing: 1 },
   word: { fontSize: 24, fontWeight: '700', color: colors.text },
   meaning: { fontSize: 16, color: colors.muted },
