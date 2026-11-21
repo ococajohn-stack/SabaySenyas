@@ -6,8 +6,12 @@ import { useLearningState } from "../../components/AppState";
 import PrimaryButton from "../../components/PrimaryButton";
 import { colors, MIN_TOUCH, radius, spacing } from "../../theme";
 
-const UNIT_TITLES = ["Mga Batayan ng FSL", "Pang-araw-araw na Pakikipag-usap", "Mga Tao at Lugar", "Araw-araw na Usapan"];
-const BASE_PROGRESS = [4, 4, 3, 3];
+const UNIT_TITLES = [
+  "Mga Batayan ng FSL",
+  "Pang-araw-araw na Pakikipag-usap",
+  "Mga Tao at Lugar",
+  "Araw-araw na Usapan",
+];
 const UNITS = [1, 2, 3, 4].map((n) => ({
   id: String(n),
   number: `0${n}`,
@@ -17,11 +21,16 @@ const UNITS = [1, 2, 3, 4].map((n) => ({
 export default function LessonsScreen() {
   const router = useRouter();
   const { lessonsCompleted, completedLessonIds } = useLearningState();
-  const unitProgress = BASE_PROGRESS.map((progress, index) => {
-    const additional = completedLessonIds.filter((id) => id.startsWith(`unit-${index + 1}-`)).length;
-    return Math.min(5, progress + additional);
-  });
-  const completedUnits = unitProgress.filter((progress) => progress === 5).length;
+  const unitProgress = UNITS.map((unit) =>
+    Math.min(
+      5,
+      completedLessonIds.filter((id) => id.startsWith(`unit-${unit.id}-`))
+        .length,
+    ),
+  );
+  const completedUnits = unitProgress.filter(
+    (progress) => progress === 5,
+  ).length;
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
@@ -29,28 +38,40 @@ export default function LessonsScreen() {
         <View style={styles.hero}>
           <Text style={styles.title}>Mga Aralin</Text>
           <Text style={styles.subtitle}>
-            Linangin ang iyong kakayahan sa Wikang Pasenyas ng Pilipinas (FSL) nang paisa-isang hakbang.
+            Linangin ang iyong kakayahan sa Wikang Pasenyas ng Pilipinas (FSL)
+            nang paisa-isang hakbang.
           </Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.small}>Kabuuang progreso</Text>
-          <Text style={styles.bigText}>{lessonsCompleted} na aralin ang natapos</Text>
+          <Text style={styles.bigText}>
+            {lessonsCompleted} na aralin ang natapos
+          </Text>
           <View style={styles.track}>
-            <View style={[styles.fill, { width: `${Math.min(100, lessonsCompleted / 20 * 100)}%` }]} />
+            <View
+              style={[
+                styles.fill,
+                { width: `${Math.min(100, (lessonsCompleted / 20) * 100)}%` },
+              ]}
+            />
           </View>
         </View>
 
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>Mga Yunit</Text>
-          <Text style={styles.small}>{completedUnits} sa 4 na yunit ang natapos</Text>
+          <Text style={styles.small}>
+            {completedUnits} sa 4 na yunit ang natapos
+          </Text>
         </View>
 
         {UNITS.map((unit, index) => (
           <Pressable
             key={unit.id}
             style={styles.row}
-            onPress={() => router.push({ pathname: "/lesson", params: { unit: unit.id } })}
+            onPress={() =>
+              router.push({ pathname: "/lesson", params: { unit: unit.id } })
+            }
             accessibilityRole="button"
             accessibilityLabel={`Yunit ${unit.number}, ${unit.title}, ${unitProgress[index]} sa 5 aralin`}
           >
@@ -60,11 +81,22 @@ export default function LessonsScreen() {
             <View style={styles.unitBody}>
               <View style={styles.unitHeading}>
                 <Text style={styles.rowTitle}>{unit.title}</Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={colors.muted}
+                />
               </View>
-              <Text style={styles.rowSub}>{unitProgress[index]} sa 5 aralin</Text>
+              <Text style={styles.rowSub}>
+                {unitProgress[index]} sa 5 aralin
+              </Text>
               <View style={styles.track}>
-                <View style={[styles.fill, { width: `${unitProgress[index] / 5 * 100}%` }]} />
+                <View
+                  style={[
+                    styles.fill,
+                    { width: `${(unitProgress[index] / 5) * 100}%` },
+                  ]}
+                />
               </View>
             </View>
           </Pressable>
@@ -87,7 +119,13 @@ export default function LessonsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  hero: { backgroundColor: colors.slate, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs, elevation: 2 },
+  hero: {
+    backgroundColor: colors.slate,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.xs,
+    elevation: 2,
+  },
   title: { fontSize: 28, fontWeight: "700", color: colors.onPrimary },
   subtitle: { fontSize: 14, color: "#CBD5E1" },
   card: {
@@ -136,7 +174,11 @@ const styles = StyleSheet.create({
   },
   numberText: { fontSize: 14, fontWeight: "600", color: colors.text },
   unitBody: { flex: 1, gap: spacing.sm },
-  unitHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  unitHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   rowTitle: { flex: 1, fontSize: 16, fontWeight: "600", color: colors.text },
   rowSub: { fontSize: 14, color: colors.muted },
 });

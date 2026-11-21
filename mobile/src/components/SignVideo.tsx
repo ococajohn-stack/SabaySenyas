@@ -1,8 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useVideoPlayer, VideoView, type VideoPlayer, type VideoSource } from 'expo-video';
-import { useSettingsState } from './AppState';
-import { radius, spacing } from '../theme';
+import { Ionicons } from "@expo/vector-icons";
+import {
+    useVideoPlayer,
+    VideoView,
+    type VideoPlayer,
+    type VideoSource,
+} from "expo-video";
+import { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { colors, radius, spacing } from "../theme";
+import { useSettingsState } from "./AppState";
 
 function setPlayerPlaybackRate(player: VideoPlayer, playbackRate: number) {
   player.playbackRate = playbackRate;
@@ -14,6 +20,7 @@ type Props = {
   meaning: string;
   height?: number;
   captionsEnabledByDefault?: boolean;
+  previewLabel?: string;
 };
 
 export default function SignVideo({
@@ -22,6 +29,7 @@ export default function SignVideo({
   meaning,
   height = 220,
   captionsEnabledByDefault,
+  previewLabel,
 }: Props) {
   const { preferences, triggerHapticFeedback } = useSettingsState();
   const defaultPlaybackRate = preferences.defaultSlowMotion ? 0.5 : 1;
@@ -30,10 +38,15 @@ export default function SignVideo({
     slowMotionEnabled: boolean;
     rate: number;
   } | null>(null);
-  const captionsEnabled = captionOverride ?? captionsEnabledByDefault ?? preferences.subtitlesByDefault;
-  const playbackRate = playbackRateOverride?.slowMotionEnabled === preferences.defaultSlowMotion
-    ? playbackRateOverride.rate
-    : defaultPlaybackRate;
+  const [previewVisible, setPreviewVisible] = useState(true);
+  const captionsEnabled =
+    captionOverride ??
+    captionsEnabledByDefault ??
+    preferences.subtitlesByDefault;
+  const playbackRate =
+    playbackRateOverride?.slowMotionEnabled === preferences.defaultSlowMotion
+      ? playbackRateOverride.rate
+      : defaultPlaybackRate;
   const player = useVideoPlayer(videoSource, (videoPlayer) => {
     videoPlayer.loop = true;
     videoPlayer.playbackRate = defaultPlaybackRate;
@@ -57,14 +70,32 @@ export default function SignVideo({
 
   return (
     <View style={[styles.container, { height }]}>
-      <VideoView player={player} nativeControls contentFit="contain" style={styles.video} />
+      <VideoView
+        player={player}
+        nativeControls
+        contentFit="contain"
+        style={styles.video}
+        onFirstFrameRender={() => setPreviewVisible(false)}
+      />
+      {previewLabel && previewVisible ? (
+        <View pointerEvents="none" style={styles.preview}>
+          <View style={styles.previewIcon}>
+            <Ionicons
+              name="hand-left-outline"
+              size={30}
+              color={colors.onPrimary}
+            />
+          </View>
+          <Text style={styles.previewLabel}>{previewLabel}</Text>
+        </View>
+      ) : null}
       <Pressable
         style={styles.speedButton}
         onPress={togglePlaybackRate}
         accessibilityRole="button"
         accessibilityLabel={`Bilis ng bidyo: ${playbackRate} ulit`}
       >
-        <Text style={styles.ccText}>{playbackRate === 1 ? '1x' : '0.5x'}</Text>
+        <Text style={styles.ccText}>{playbackRate === 1 ? "1x" : "0.5x"}</Text>
       </Pressable>
       <Pressable
         style={styles.ccButton}
@@ -73,13 +104,20 @@ export default function SignVideo({
           triggerHapticFeedback();
         }}
         accessibilityRole="button"
-        accessibilityLabel={captionsEnabled ? 'Itago ang paliwanag' : 'Ipakita ang paliwanag'}
+        accessibilityLabel={
+          captionsEnabled ? "Itago ang paliwanag" : "Ipakita ang paliwanag"
+        }
         accessibilityState={{ selected: captionsEnabled }}
       >
-        <Text style={styles.ccText}>{captionsEnabled ? 'Itago' : 'Ipakita'}</Text>
+        <Text style={styles.ccText}>
+          {captionsEnabled ? "Itago" : "Ipakita"}
+        </Text>
       </Pressable>
       {captionsEnabled ? (
-        <View style={styles.subtitle} accessibilityLabel={`${title}: ${meaning}`}>
+        <View
+          style={styles.subtitle}
+          accessibilityLabel={`${title}: ${meaning}`}
+        >
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.meaning}>{meaning}</Text>
         </View>
@@ -90,47 +128,73 @@ export default function SignVideo({
 
 const styles = StyleSheet.create({
   container: {
-    position: 'relative',
-    width: '100%',
+    position: "relative",
+    width: "100%",
     borderRadius: radius.md,
-    overflow: 'hidden',
-    backgroundColor: '#000',
+    overflow: "hidden",
+    backgroundColor: "#000",
   },
-  video: { width: '100%', height: '100%' },
+  video: { width: "100%", height: "100%" },
+  preview: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.slate,
+  },
+  previewIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewLabel: {
+    color: colors.onPrimary,
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   speedButton: {
-    position: 'absolute',
+    position: "absolute",
     top: spacing.sm,
     left: spacing.sm,
     minWidth: 48,
     minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: "rgba(0, 0, 0, 0.72)",
   },
   ccButton: {
-    position: 'absolute',
+    position: "absolute",
     top: spacing.sm,
     right: spacing.sm,
     minWidth: 44,
     minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: "rgba(0, 0, 0, 0.72)",
   },
-  ccText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  ccText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   subtitle: {
-    position: 'absolute',
+    position: "absolute",
     bottom: spacing.sm,
-    alignSelf: 'center',
-    maxWidth: '90%',
-    alignItems: 'center',
+    alignSelf: "center",
+    maxWidth: "90%",
+    alignItems: "center",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: "rgba(0, 0, 0, 0.72)",
   },
-  title: { color: '#fff', fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  meaning: { color: '#fff', fontSize: 12, textAlign: 'center' },
+  title: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  meaning: { color: "#fff", fontSize: 12, textAlign: "center" },
 });

@@ -1,87 +1,102 @@
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLearningState } from '../components/AppState';
+import { Circle, G, Svg } from 'react-native-svg';
+import { useLearningState, useSettingsState } from '../components/AppState';
 import PrimaryButton from '../components/PrimaryButton';
-import SignVideo from '../components/SignVideo';
+import SignGestureDetector, {
+  type DetectorProgress,
+  type DetectorStatus,
+} from '../components/SignGestureDetector';
 import { SIGNS } from '../data/signs';
 import { colors, MIN_TOUCH, radius, spacing } from '../theme';
 
-const COUNTDOWN_SECONDS = 3;
+const HOLD_RING_SIZE = 48;
+const HOLD_RING_RADIUS = 19;
+const HOLD_RING_CIRCUMFERENCE = 2 * Math.PI * HOLD_RING_RADIUS;
+
+const emptyProgress = (signId: string): DetectorProgress => ({
+  signId,
+  confidence: 0,
+  holdProgress: 0,
+  detected: false,
+  faceVisible: false,
+});
 
 export default function PracticeScreen() {
   const router = useRouter();
   const { markSignLearned } = useLearningState();
+  const { triggerHapticFeedback } = useSettingsState();
   const [permission, requestPermission] = useCameraPermissions();
   const [signIndex, setSignIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const [gestureReady, setGestureReady] = useState(false);
-  const [referenceVisible, setReferenceVisible] = useState(false);
+  const [correctBadge, setCorrectBadge] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const sign = SIGNS[signIndex];
+  const [detectorStatus, setDetectorStatus] = useState<DetectorStatus>('loading');
+  const [detectorMessage, setDetectorMessage] = useState('');
+  const [detectorProgress, setDetectorProgress] = useState(() => emptyProgress(SIGNS[0].id));
+  const verifiedSignRef = useRef<string | null>(null);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentSign = SIGNS[signIndex];
+  const currentProgress = detectorProgress.signId === currentSign.id
+    ? detectorProgress
+    : emptyProgress(currentSign.id);
 
   useEffect(() => {
-    if (countdown === null) return undefined;
-    const timer = setTimeout(() => {
-      if (countdown === 1) {
-        setCountdown(null);
-        setGestureReady(true);
-      } else {
-        setCountdown(countdown - 1);
-      }
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [countdown]);
+    if (permission?.canAskAgain) void requestPermission();
+  }, [permission?.canAskAgain, requestPermission]);
 
-  const startCountdown = () => {
-    setGestureReady(false);
-    setCountdown(COUNTDOWN_SECONDS);
-  };
-
-  const confirmGesture = () => {
-    markSignLearned(sign.id);
-    setScore((currentScore) => currentScore + 1);
-    setGestureReady(false);
-    setReferenceVisible(false);
-
-    if (signIndex === SIGNS.length - 1) {
-      setCompleted(true);
-    } else {
-      setSignIndex((currentIndex) => currentIndex + 1);
-    }
-  };
-
-  const cameraPreview = permission?.granted ? (
-    <View style={[styles.cameraFrame, referenceVisible && styles.cameraCompact]}>
-      <CameraView style={styles.camera} facing="front" />
-      <View pointerEvents="none" style={styles.alignmentOverlay}>
-        <View style={styles.alignmentFrame}>
-          <Text style={styles.alignmentText}>Panatilihing kita sa kuha ang itaas ng katawan at mga kamay</Text>
-        </View>
-      </View>
-      {countdown !== null ? (
-        <View style={styles.countdownOverlay} accessibilityLiveRegion="polite">
-          <Text style={styles.countdownText}>{countdown}</Text>
-        </View>
-      ) : null}
-    </View>
-  ) : (
-    <View style={styles.permissionCard}>
-      <Ionicons name="camera-outline" size={32} color={colors.text} />
-      <Text style={styles.cardTitle}>Kailangan ng pahintulot sa kamera</Text>
-      <Text style={styles.body}>
-        Payagan ang paggamit ng kamera upang makita mo ang sarili habang nagsasanay. Hindi nire-record ang nakikita ng kamera.
-      </Text>
-      {permission?.canAskAgain === false ? (
-        <Text style={styles.body}>Tinanggihan ang pahintulot sa kamera. Paganahin ito sa mga setting ng iyong aparato upang magpatuloy.</Text>
-      ) : null}
-      <PrimaryButton label="Payagan ang Kamera" onPress={requestPermission} />
-    </View>
+  useEffect(
+    () => () => {
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    },
+    [],
   );
+
+  const advanceSign = (index: number) => {
+    verifiedSignRef.current = null;
+    if (index >= SIGNS.length - 1) {
+      setCompleted(true);
+      return;
+    }
+    setSignIndex(index + 1);
+    setDetectorProgress(emptyProgress(SIGNS[index + 1].id));
+  };
+
+  const handleVerified = (signId: string) => {
+    if (signId !== currentSign.id || verifiedSignRef.current === signId) return;
+    verifiedSignRef.current = signId;
+    setCorrectBadge(true);
+    setScore((value) => value + 1);
+    markSignLearned(signId);
+    triggerHapticFeedback();
+    advanceTimerRef.current = setTimeout(() => {
+      setCorrectBadge(false);
+      advanceSign(signIndex);
+    }, 1000);
+  };
+
+  const skipSign = () => {
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    verifiedSignRef.current = null;
+    setCorrectBadge(false);
+    advanceSign(signIndex);
+  };
+
+  const restartPractice = () => {
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    verifiedSignRef.current = null;
+    setSignIndex(0);
+    setScore(0);
+    setCorrectBadge(false);
+    setDetectorProgress(emptyProgress(SIGNS[0].id));
+    setDetectorStatus('loading');
+    setDetectorMessage('');
+    setCompleted(false);
+  };
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -98,29 +113,20 @@ export default function PracticeScreen() {
         {completed ? (
           <View style={styles.completion}>
             <View style={styles.completeIcon}>
-              <Ionicons name="checkmark" size={28} color={colors.onPrimary} />
+              <Ionicons name="trophy-outline" size={28} color={colors.onPrimary} />
             </View>
-            <Text style={styles.title}>Tapos na ang Pagsasanay!</Text>
-            <Text style={styles.body}>
-              Nakumpirma mo ang lahat ng {SIGNS.length} na senyas. Na-update na ang talaan ng mga natutuhan mo.
-            </Text>
+            <Text style={styles.title}>Mahusay! Tapos na ang Pagsasanay</Text>
             <Text style={styles.score}>Iskor: {score} / {SIGNS.length}</Text>
-            <PrimaryButton label="Bumalik sa mga Aralin" onPress={() => router.replace('/lessons')} />
-            <PrimaryButton label="Magsanay Muli" variant="secondary" onPress={() => {
-              setSignIndex(0);
-              setScore(0);
-              setCountdown(null);
-              setGestureReady(false);
-              setCompleted(false);
-            }} />
+            <PrimaryButton label="Ulitin ang Pagsasanay" onPress={restartPractice} />
+            <PrimaryButton label="Bumalik sa Tahanan" variant="secondary" onPress={() => router.replace('/home')} />
           </View>
         ) : (
           <>
             <View style={styles.heading}>
               <View style={styles.headingCopy}>
-                <Text style={styles.eyebrow}>IPAKITA ANG SENYAS</Text>
-                <Text style={styles.title}>Gawin ang senyas para sa: {sign.title}</Text>
-                <Text style={styles.meaning}>{sign.meaning}</Text>
+                <Text style={styles.eyebrow}>INTERAKTIBONG PAGSASANAY</Text>
+                <Text style={styles.title}>Sanayin ang mga Senyas</Text>
+                <Text style={styles.meaning}>Ipakita ang bawat senyas sa kamera upang awtomatikong magpatuloy.</Text>
               </View>
               <Text style={styles.score}>Iskor: {score} / {SIGNS.length}</Text>
             </View>
@@ -134,53 +140,125 @@ export default function PracticeScreen() {
             </View>
             <Text style={styles.progress}>Senyas {signIndex + 1} sa {SIGNS.length}</Text>
 
-            <Pressable
-              style={styles.referenceToggle}
-              onPress={() => setReferenceVisible((visible) => !visible)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: referenceVisible }}
-            >
-              <Text style={styles.cardTitle}>Bidyo Bilang Halimbawa</Text>
-              <Ionicons
-                name={referenceVisible ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color={colors.text}
-              />
-            </Pressable>
-            {referenceVisible && permission?.granted ? (
-              <View style={styles.comparison}>
-                {cameraPreview}
-                <View style={styles.referencePanel}>
-                  <Text style={styles.referenceLabel}>Halimbawa</Text>
-                  <SignVideo
-                    videoSource={sign.videoSource}
-                    title={sign.title}
-                    meaning={sign.meaning}
-                    height={260}
-                  />
-                </View>
-              </View>
-            ) : (
-              cameraPreview
-            )}
+            <View style={styles.targetCard}>
+              <Text style={styles.targetCategory}>{currentSign.category.toUpperCase()}</Text>
+              <Text style={styles.targetTitle}>{currentSign.title}</Text>
+              <Text style={styles.meaning}>{currentSign.meaning}</Text>
+              <Text style={styles.cue}>{currentSign.description}</Text>
+            </View>
 
-            {permission?.granted ? (
-              gestureReady ? (
-                <View style={styles.actions}>
-                  <PrimaryButton label="Nagawa Ko Ito" onPress={confirmGesture} />
-                  <PrimaryButton label="Subukan Muli" variant="secondary" onPress={startCountdown} />
-                </View>
-              ) : (
-                <PrimaryButton
-                  label={countdown === null ? 'Gawin ang Senyas' : `Magsisimula sa ${countdown}...`}
-                  onPress={startCountdown}
-                  disabled={countdown !== null}
-                />
-              )
-            ) : null}
-            <Text style={styles.disclaimer}>
-              Batay sa sarili mong pagsusuri ang iskor; hindi sinusuri ng kamera ang mga senyas.
+            <View style={styles.cameraSection}>
+              <Text style={styles.sectionTitle}>Ipakita ang senyas sa kamera</Text>
+              <View style={styles.cameraFrame}>
+                {permission?.granted ? (
+                  Platform.OS === 'web' ? (
+                    <View style={styles.permissionState}>
+                      <Ionicons name="phone-portrait-outline" size={28} color={colors.primary} />
+                      <Text style={styles.permissionText}>Gumamit ng Android o iPhone para sa live na pagkilala sa kamay.</Text>
+                    </View>
+                  ) : (
+                    <SignGestureDetector
+                      targetSignId={currentSign.id}
+                      onProgress={(progress) => {
+                        if (progress.signId === currentSign.id) setDetectorProgress(progress);
+                      }}
+                      onVerified={handleVerified}
+                      onStatusChange={(status, message) => {
+                        setDetectorStatus(status);
+                        setDetectorMessage(message ?? '');
+                      }}
+                    />
+                  )
+                ) : (
+                  <View style={styles.permissionState}>
+                    <View style={styles.permissionIcon}>
+                      <Ionicons name="camera-outline" size={28} color={colors.primary} />
+                    </View>
+                    <Text style={styles.permissionText}>Kailangan ng pahintulot sa kamera upang makita ang iyong pagsasanay.</Text>
+                    {permission?.canAskAgain === false ? (
+                      <Text style={styles.body}>Paganahin ang pahintulot sa mga setting ng iyong aparato upang magpatuloy.</Text>
+                    ) : null}
+                    <PrimaryButton label="Payagan ang Kamera" onPress={() => { void requestPermission(); }} />
+                  </View>
+                )}
+
+                {permission?.granted && Platform.OS !== 'web' ? (
+                  <View pointerEvents="none" style={styles.cameraOverlay}>
+                    <View style={styles.alignmentFrame} />
+                    <View style={styles.detectorStatusPill}>
+                      <View
+                        style={styles.holdRing}
+                        accessibilityRole="progressbar"
+                        accessibilityValue={{ min: 0, max: 100, now: Math.round(currentProgress.holdProgress * 100) }}
+                      >
+                        <Svg width={HOLD_RING_SIZE} height={HOLD_RING_SIZE}>
+                          <G rotation={-90} origin={`${HOLD_RING_SIZE / 2}, ${HOLD_RING_SIZE / 2}`}>
+                            <Circle
+                              cx={HOLD_RING_SIZE / 2}
+                              cy={HOLD_RING_SIZE / 2}
+                              r={HOLD_RING_RADIUS}
+                              fill="none"
+                              stroke="rgba(255,255,255,0.28)"
+                              strokeWidth={4}
+                            />
+                            <Circle
+                              cx={HOLD_RING_SIZE / 2}
+                              cy={HOLD_RING_SIZE / 2}
+                              r={HOLD_RING_RADIUS}
+                              fill="none"
+                              stroke={correctBadge ? '#22C55E' : '#5EEAD4'}
+                              strokeWidth={4}
+                              strokeLinecap="round"
+                              strokeDasharray={HOLD_RING_CIRCUMFERENCE}
+                              strokeDashoffset={HOLD_RING_CIRCUMFERENCE * (1 - currentProgress.holdProgress)}
+                            />
+                          </G>
+                        </Svg>
+                        <Text style={styles.ringLabel}>{Math.round(currentProgress.holdProgress * 100)}%</Text>
+                      </View>
+                      <View style={styles.detectorCopy}>
+                        {correctBadge ? (
+                          <Text style={styles.correctBadge}>Tama! ✅</Text>
+                        ) : detectorStatus === 'error' ? (
+                          <Text style={styles.detectorText}>{detectorMessage}</Text>
+                        ) : detectorStatus === 'ready' && signIndex < 7 && !currentProgress.faceVisible ? (
+                          <Text style={styles.detectorText}>Ipakita ang iyong mukha at kamay sa frame.</Text>
+                        ) : currentProgress.holdProgress > 0 ? (
+                          <Text style={styles.detectorText}>
+                            Pinapanatili ang senyas... {Math.round(currentProgress.holdProgress * 100)}%
+                          </Text>
+                        ) : currentProgress.detected ? (
+                          <Text style={styles.detectorText}>
+                            Nasusuri ang senyas... {currentProgress.confidence}%
+                          </Text>
+                        ) : (
+                          <Text style={styles.detectorText}>
+                            {detectorStatus === 'loading' ? 'Inihahanda ang pagkilala...' : 'Ipakita ang senyas sa kamera...'}
+                          </Text>
+                        )}
+                        {detectorStatus === 'ready' && !correctBadge ? (
+                          <Text style={styles.confidenceText}>Tiwala: {currentProgress.confidence}%</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            <Text style={styles.footerNote}>
+              Awtomatikong sinusuri ng kamera ang iyong senyas upang magpatuloy.
             </Text>
+
+            <Pressable
+              style={styles.skipButton}
+              onPress={skipSign}
+              accessibilityRole="button"
+              accessibilityLabel="Laktawan ang senyas"
+            >
+              <Text style={styles.skipText}>Laktawan</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+            </Pressable>
           </>
         )}
       </ScrollView>
@@ -196,74 +274,55 @@ const styles = StyleSheet.create({
   headingCopy: { gap: spacing.xs },
   eyebrow: { color: colors.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   title: { color: colors.text, fontSize: 24, fontWeight: '700' },
-  meaning: { color: colors.muted, fontSize: 16 },
+  meaning: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   score: { color: colors.text, fontSize: 14, fontWeight: '600' },
   track: { height: 7, borderRadius: radius.pill, backgroundColor: colors.border, overflow: 'hidden' },
   fill: { height: 7, backgroundColor: colors.primary },
   progress: { color: colors.muted, fontSize: 13, textAlign: 'right', marginTop: -spacing.sm },
-  cameraFrame: { height: 360, position: 'relative', overflow: 'hidden', borderRadius: radius.md, backgroundColor: '#000' },
-  cameraCompact: { height: 260, flex: 1 },
-  comparison: { flexDirection: 'row', gap: spacing.sm },
-  referencePanel: { flex: 1, gap: spacing.xs },
-  referenceLabel: { color: colors.muted, fontSize: 12, fontWeight: '600' },
-  camera: { flex: 1 },
-  alignmentOverlay: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
+  targetCard: {
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  alignmentFrame: {
-    width: '76%',
-    height: '82%',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    padding: spacing.sm,
-    borderWidth: 2,
-    borderColor: '#fff',
-    borderRadius: radius.md,
-  },
-  alignmentText: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-    color: '#fff',
-    fontSize: 12,
-    textAlign: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-  },
-  countdownOverlay: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.28)',
-  },
-  countdownText: { color: '#fff', fontSize: 72, fontWeight: '700' },
-  permissionCard: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, elevation: 1 },
-  cardTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
-  body: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
-  referenceToggle: {
-    minHeight: MIN_TOUCH,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.xs,
     elevation: 1,
   },
-  actions: { gap: spacing.sm },
-  disclaimer: { color: colors.muted, fontSize: 12, textAlign: 'center' },
+  targetCategory: { color: colors.muted, fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+  targetTitle: { color: colors.text, fontSize: 26, fontWeight: '700', textAlign: 'center' },
+  cue: { color: colors.text, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: spacing.xs },
+  cameraSection: { gap: spacing.sm },
+  sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  cameraFrame: { height: 380, position: 'relative', overflow: 'hidden', borderRadius: radius.md, backgroundColor: colors.slate },
+  permissionState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
+  permissionIcon: { width: 56, height: 56, borderRadius: radius.pill, backgroundColor: colors.chip, alignItems: 'center', justifyContent: 'center' },
+  permissionText: { maxWidth: 280, color: colors.text, fontSize: 15, fontWeight: '600', lineHeight: 22, textAlign: 'center' },
+  cameraOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', padding: spacing.sm },
+  alignmentFrame: { width: '82%', height: '74%', borderWidth: 2, borderColor: 'rgba(255,255,255,0.62)', borderRadius: radius.md },
+  detectorStatusPill: {
+    position: 'absolute',
+    left: spacing.sm,
+    right: spacing.sm,
+    bottom: spacing.sm,
+    minHeight: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(15, 23, 42, 0.78)',
+  },
+  holdRing: { width: HOLD_RING_SIZE, height: HOLD_RING_SIZE, alignItems: 'center', justifyContent: 'center' },
+  ringLabel: { position: 'absolute', color: '#fff', fontSize: 11, fontWeight: '700' },
+  detectorCopy: { flex: 1, gap: 3 },
+  detectorText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  confidenceText: { color: '#CBD5E1', fontSize: 11 },
+  correctBadge: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.pill, color: '#fff', backgroundColor: '#15803D', fontSize: 13, fontWeight: '700' },
+  footerNote: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  skipButton: { minHeight: MIN_TOUCH, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md },
+  skipText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  body: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   completion: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   completeIcon: { width: 60, height: 60, borderRadius: radius.pill, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
 });
