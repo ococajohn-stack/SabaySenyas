@@ -33,7 +33,7 @@ type EmbeddedWebViewProps = {
   onHttpError: () => void;
   javaScriptEnabled: boolean;
   mediaPlaybackRequiresUserAction: boolean;
-  mediaCapturePermissionGrantType: 'grantIfSameHostElsePrompt';
+  mediaCapturePermissionGrantType: 'grant';
   allowsInlineMediaPlayback: boolean;
   scrollEnabled: boolean;
   bounces: boolean;
@@ -587,7 +587,7 @@ export default function SignGestureDetector({
         onHttpError={() => onStatusChange('error', 'Hindi ma-download ang mga file para sa pagkilala. Suriin ang koneksiyon o laktawan ang senyas.')}
         javaScriptEnabled
         mediaPlaybackRequiresUserAction={false}
-        mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
+        mediaCapturePermissionGrantType="grant"
         allowsInlineMediaPlayback
         scrollEnabled={false}
         bounces={false}
@@ -599,7 +599,15 @@ export default function SignGestureDetector({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#172b2a' },
-  webViewContainer: { flex: 1, backgroundColor: '#172b2a' },
-  webView: { flex: 1, backgroundColor: 'transparent' },
+  container: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 1,
+    height: 1,
+    opacity: 0,
+    overflow: 'hidden',
+  },
+  webViewContainer: { width: 1, height: 1, backgroundColor: 'transparent' },
+  webView: { width: 1, height: 1, backgroundColor: 'transparent' },
 });

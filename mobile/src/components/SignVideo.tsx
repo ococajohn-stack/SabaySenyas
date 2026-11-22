@@ -20,6 +20,7 @@ type Props = {
   meaning: string;
   height?: number;
   captionsEnabledByDefault?: boolean;
+  showCaptions?: boolean;
   previewLabel?: string;
 };
 
@@ -29,6 +30,7 @@ export default function SignVideo({
   meaning,
   height = 220,
   captionsEnabledByDefault,
+  showCaptions = true,
   previewLabel,
 }: Props) {
   const { preferences, triggerHapticFeedback } = useSettingsState();
@@ -39,10 +41,11 @@ export default function SignVideo({
     rate: number;
   } | null>(null);
   const [previewVisible, setPreviewVisible] = useState(true);
-  const captionsEnabled =
+  const captionsEnabled = showCaptions && (
     captionOverride ??
     captionsEnabledByDefault ??
-    preferences.subtitlesByDefault;
+    preferences.subtitlesByDefault
+  );
   const playbackRate =
     playbackRateOverride?.slowMotionEnabled === preferences.defaultSlowMotion
       ? playbackRateOverride.rate
@@ -97,22 +100,24 @@ export default function SignVideo({
       >
         <Text style={styles.ccText}>{playbackRate === 1 ? "1x" : "0.5x"}</Text>
       </Pressable>
-      <Pressable
-        style={styles.ccButton}
-        onPress={() => {
-          setCaptionOverride(!captionsEnabled);
-          triggerHapticFeedback();
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={
-          captionsEnabled ? "Itago ang paliwanag" : "Ipakita ang paliwanag"
-        }
-        accessibilityState={{ selected: captionsEnabled }}
-      >
-        <Text style={styles.ccText}>
-          {captionsEnabled ? "Itago" : "Ipakita"}
-        </Text>
-      </Pressable>
+      {showCaptions ? (
+        <Pressable
+          style={styles.ccButton}
+          onPress={() => {
+            setCaptionOverride(!captionsEnabled);
+            triggerHapticFeedback();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={
+            captionsEnabled ? "Itago ang paliwanag" : "Ipakita ang paliwanag"
+          }
+          accessibilityState={{ selected: captionsEnabled }}
+        >
+          <Text style={styles.ccText}>
+            {captionsEnabled ? "Itago" : "Ipakita"}
+          </Text>
+        </Pressable>
+      ) : null}
       {captionsEnabled ? (
         <View
           style={styles.subtitle}

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -17,6 +17,7 @@ import { colors, MIN_TOUCH, radius, spacing } from '../theme';
 const HOLD_RING_SIZE = 48;
 const HOLD_RING_RADIUS = 19;
 const HOLD_RING_CIRCUMFERENCE = 2 * Math.PI * HOLD_RING_RADIUS;
+const FALLBACK_HOLD_DURATION = 1200;
 
 const emptyProgress = (signId: string): DetectorProgress => ({
   signId,
@@ -28,6 +29,7 @@ const emptyProgress = (signId: string): DetectorProgress => ({
 
 export default function PracticeScreen() {
   const router = useRouter();
+  const isWebPlatform = Platform.OS === 'web';
   const { markSignLearned } = useLearningState();
   const { triggerHapticFeedback } = useSettingsState();
   const [permission, requestPermission] = useCameraPermissions();
@@ -38,8 +40,11 @@ export default function PracticeScreen() {
   const [detectorStatus, setDetectorStatus] = useState<DetectorStatus>('loading');
   const [detectorMessage, setDetectorMessage] = useState('');
   const [detectorProgress, setDetectorProgress] = useState(() => emptyProgress(SIGNS[0].id));
+  const [fallbackHoldProgress, setFallbackHoldProgress] = useState(0);
   const verifiedSignRef = useRef<string | null>(null);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackHoldTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fallbackHoldStartedRef = useRef<number | null>(null);
   const currentSign = SIGNS[signIndex];
   const currentProgress = detectorProgress.signId === currentSign.id
     ? detectorProgress
@@ -52,9 +57,19 @@ export default function PracticeScreen() {
   useEffect(
     () => () => {
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+      if (fallbackHoldTimerRef.current) clearInterval(fallbackHoldTimerRef.current);
     },
     [],
   );
+
+  useEffect(() => {
+    if (detectorStatus !== 'loading' || completed) return;
+    const timeout = setTimeout(() => {
+      setDetectorStatus('error');
+      setDetectorMessage('Mabagal magsimula ang awtomatikong pagkilala. Maaari mong gamitin ang kumpirmasyon sa ibaba.');
+    }, 15_000);
+    return () => clearTimeout(timeout);
+  }, [completed, detectorStatus]);
 
   const advanceSign = (index: number) => {
     verifiedSignRef.current = null;
@@ -88,6 +103,10 @@ export default function PracticeScreen() {
 
   const restartPractice = () => {
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    if (fallbackHoldTimerRef.current) clearInterval(fallbackHoldTimerRef.current);
+    fallbackHoldTimerRef.current = null;
+    fallbackHoldStartedRef.current = null;
+    setFallbackHoldProgress(0);
     verifiedSignRef.current = null;
     setSignIndex(0);
     setScore(0);
@@ -96,6 +115,28 @@ export default function PracticeScreen() {
     setDetectorStatus('loading');
     setDetectorMessage('');
     setCompleted(false);
+  };
+
+  const stopFallbackHold = () => {
+    if (fallbackHoldTimerRef.current) clearInterval(fallbackHoldTimerRef.current);
+    fallbackHoldTimerRef.current = null;
+    fallbackHoldStartedRef.current = null;
+    setFallbackHoldProgress(0);
+  };
+
+  const startFallbackHold = () => {
+    if (detectorStatus !== 'error' || fallbackHoldTimerRef.current) return;
+    fallbackHoldStartedRef.current = Date.now();
+    fallbackHoldTimerRef.current = setInterval(() => {
+      const startedAt = fallbackHoldStartedRef.current;
+      if (startedAt === null) return;
+      const progress = Math.min((Date.now() - startedAt) / FALLBACK_HOLD_DURATION, 1);
+      setFallbackHoldProgress(progress);
+      if (progress === 1) {
+        stopFallbackHold();
+        handleVerified(currentSign.id);
+      }
+    }, 50);
   };
 
   return (
@@ -112,13 +153,50 @@ export default function PracticeScreen() {
 
         {completed ? (
           <View style={styles.completion}>
-            <View style={styles.completeIcon}>
-              <Ionicons name="trophy-outline" size={28} color={colors.onPrimary} />
+            <View style={styles.completionCard}>
+              <View
+                style={[
+                  styles.completeIcon,
+                  score === 0 && styles.retryIcon,
+                  score > 0 && score < SIGNS.length && styles.progressIcon,
+                ]}
+              >
+                <Ionicons
+                  name={score === 0 ? 'refresh' : score === SIGNS.length ? 'trophy' : 'hand-left-outline'}
+                  size={28}
+                  color={score === 0 ? colors.accent : score === SIGNS.length ? colors.onPrimary : '#92400E'}
+                />
+              </View>
+              <Text style={styles.completionTitle}>
+                {score === 0
+                  ? 'Subukan Muli! Wala pang tamang senyas'
+                  : score === SIGNS.length
+                    ? 'Mahusay! Perpektong Iskor!'
+                    : 'Magandang Simula! Tapos na ang Pagsasanay'}
+              </Text>
+              <Text style={styles.completionSubtitle}>
+                {score === 0
+                  ? 'Huwag mag-alala—panoorin muna ang mga bidyo sa Diksiyonaryo o Aralin at subukan ulit.'
+                  : score === SIGNS.length
+                    ? 'Nagawa mo nang tama ang lahat ng senyas. Ipagpatuloy ang pagsasanay!'
+                    : 'Patuloy na magsanay upang maperpekto ang lahat ng senyas.'}
+              </Text>
+              <View style={styles.scorePill}>
+                <Text style={styles.scorePillText}>Iskor: {score} / {SIGNS.length}</Text>
+              </View>
+              <View style={styles.practicedSigns}>
+                <Text style={styles.practicedTitle}>Mga senyas na sinanay ({SIGNS.length})</Text>
+                <View style={styles.signList}>
+                  {SIGNS.map((sign) => (
+                    <View key={sign.id} style={styles.signChip}>
+                      <Text style={styles.signChipText}>{sign.title}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+              <PrimaryButton label="Ulitin ang Pagsasanay" onPress={restartPractice} />
+              <PrimaryButton label="Bumalik sa Tahanan" variant="secondary" onPress={() => router.replace('/home')} />
             </View>
-            <Text style={styles.title}>Mahusay! Tapos na ang Pagsasanay</Text>
-            <Text style={styles.score}>Iskor: {score} / {SIGNS.length}</Text>
-            <PrimaryButton label="Ulitin ang Pagsasanay" onPress={restartPractice} />
-            <PrimaryButton label="Bumalik sa Tahanan" variant="secondary" onPress={() => router.replace('/home')} />
           </View>
         ) : (
           <>
@@ -157,17 +235,20 @@ export default function PracticeScreen() {
                       <Text style={styles.permissionText}>Gumamit ng Android o iPhone para sa live na pagkilala sa kamay.</Text>
                     </View>
                   ) : (
-                    <SignGestureDetector
-                      targetSignId={currentSign.id}
-                      onProgress={(progress) => {
-                        if (progress.signId === currentSign.id) setDetectorProgress(progress);
-                      }}
-                      onVerified={handleVerified}
-                      onStatusChange={(status, message) => {
-                        setDetectorStatus(status);
-                        setDetectorMessage(message ?? '');
-                      }}
-                    />
+                    <>
+                      <CameraView facing="front" style={StyleSheet.absoluteFill} />
+                      <SignGestureDetector
+                        targetSignId={currentSign.id}
+                        onProgress={(progress) => {
+                          if (progress.signId === currentSign.id) setDetectorProgress(progress);
+                        }}
+                        onVerified={handleVerified}
+                        onStatusChange={(status, message) => {
+                          setDetectorStatus(status);
+                          setDetectorMessage(message ?? '');
+                        }}
+                      />
+                    </>
                   )
                 ) : (
                   <View style={styles.permissionState}>
@@ -244,6 +325,21 @@ export default function PracticeScreen() {
                   </View>
                 ) : null}
               </View>
+              {permission?.granted && !isWebPlatform && detectorStatus === 'error' ? (
+                <Pressable
+                  style={styles.fallbackButton}
+                  onPressIn={startFallbackHold}
+                  onPressOut={stopFallbackHold}
+                  accessibilityRole="button"
+                  accessibilityLabel="Hawakan upang kumpirmahing naipakita ang senyas"
+                >
+                  <Text style={styles.fallbackButtonText}>
+                    {fallbackHoldProgress > 0
+                      ? `Hawakan upang kumpirmahin... ${Math.round(fallbackHoldProgress * 100)}%`
+                      : 'Hawakan upang kumpirmahin ang senyas'}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
 
             <Text style={styles.footerNote}>
@@ -323,6 +419,30 @@ const styles = StyleSheet.create({
   skipButton: { minHeight: MIN_TOUCH, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md },
   skipText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
   body: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
-  completion: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  completeIcon: { width: 60, height: 60, borderRadius: radius.pill, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  fallbackButton: { minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.primary },
+  fallbackButtonText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  completion: { flex: 1, justifyContent: 'center' },
+  completionCard: {
+    width: '100%',
+    alignItems: 'stretch',
+    gap: spacing.md,
+    padding: 24,
+    borderRadius: 24,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    elevation: 3,
+  },
+  completeIcon: { alignSelf: 'center', width: 64, height: 64, borderRadius: radius.pill, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  retryIcon: { backgroundColor: '#FEF3C7' },
+  progressIcon: { backgroundColor: '#FEF3C7' },
+  completionTitle: { color: colors.text, fontSize: 23, fontWeight: '700', textAlign: 'center' },
+  completionSubtitle: { color: colors.muted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  scorePill: { alignSelf: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.chip },
+  scorePillText: { color: colors.text, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  practicedSigns: { gap: spacing.sm, alignItems: 'center' },
+  practicedTitle: { color: colors.text, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  signList: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.xs },
+  signChip: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.pill, backgroundColor: colors.chip },
+  signChipText: { color: colors.text, fontSize: 12, fontWeight: '600', textAlign: 'center' },
 });

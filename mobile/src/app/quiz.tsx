@@ -10,9 +10,9 @@ import { SIGNS } from '../data/signs';
 import { colors, radius, spacing } from '../theme';
 
 const QUESTIONS = [
-  { prompt: 'Aling senyas ang nangangahulugang pagpapasalamat?', signId: '2', options: ['Salamat', 'Kumusta', 'Paalam', 'Ingat'], answer: 0 },
-  { prompt: 'Aling senyas ang ginagamit sa pagbati o pagtatanong kung ayos ang isang tao?', signId: '1', options: ['Tatay', 'Kumusta', 'Dalawa', 'Salamat'], answer: 1 },
-  { prompt: 'Aling senyas ang ginagamit kapag nagpapaalam?', signId: '4', options: ['Ingat', 'Nanay', 'Paalam', 'Isa'], answer: 2 },
+  { prompt: 'Ano ang ibig sabihin ng senyas na ipinapakita sa bidyo?', signId: '2', options: ['Salamat', 'Kumusta', 'Paalam', 'Ingat'], answer: 0 },
+  { prompt: 'Ano ang ibig sabihin ng senyas na ipinapakita sa bidyo?', signId: '1', options: ['Tatay', 'Kumusta', 'Dalawa', 'Salamat'], answer: 1 },
+  { prompt: 'Ano ang ibig sabihin ng senyas na ipinapakita sa bidyo?', signId: '4', options: ['Ingat', 'Nanay', 'Paalam', 'Isa'], answer: 2 },
 ];
 
 export default function QuizScreen() {
@@ -78,6 +78,7 @@ export default function QuizScreen() {
               meaning={demoSign.meaning}
               height={170}
               captionsEnabledByDefault={false}
+              showCaptions={false}
             />
 
             <View style={styles.options}>
