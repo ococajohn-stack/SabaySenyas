@@ -82,6 +82,7 @@ export default function ProfileScreen() {
   const [editing, setEditing] = useState(false);
   const [showEtiquette, setShowEtiquette] = useState(false);
   const [name, setName] = useState(user?.name ?? '');
+  const [nickname, setNickname] = useState(user?.nickname ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [error, setError] = useState('');
   const displayName = user?.name ?? 'Mag-aaral';
@@ -96,17 +97,22 @@ export default function ProfileScreen() {
 
   const beginEditing = () => {
     setName(user?.name ?? '');
+    setNickname(user?.nickname ?? '');
     setEmail(user?.email ?? '');
     setError('');
     setEditing(true);
   };
 
   const saveProfile = () => {
-    if (!name.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setError('Ilagay ang buong pangalan at wastong email address.');
+    if (!name.trim() || !nickname.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setError('Ilagay ang buong pangalan, palayaw, at wastong adres ng email.');
       return;
     }
-    updateProfile(name, email);
+    updateProfile(name, email, {
+      nickname,
+      fslLevel: user?.fslLevel ?? 'Baguhan',
+      dailyGoal: user?.dailyGoal ?? '5 min/araw',
+    });
     setEditing(false);
     setError('');
   };
@@ -151,16 +157,18 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.profileInfo}>
               <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
+              <Text style={styles.email} numberOfLines={1}>Palayaw: {user?.nickname ?? displayName}</Text>
               <Text style={styles.email} numberOfLines={1}>{user?.email ?? 'Bisitang mag-aaral'}</Text>
               <View style={styles.levelPill}>
-                <Text style={styles.levelText}>Baguhan sa FSL</Text>
+                <Text style={styles.levelText}>{user?.fslLevel ?? 'Baguhan'} sa FSL</Text>
               </View>
+              <Text style={styles.email}>Layunin: {user?.dailyGoal ?? '5 min/araw'}</Text>
             </View>
           </View>
           <PrimaryButton label="Baguhin ang Aking Pahina" variant="secondary" onPress={beginEditing} />
         </View>
 
-        <View style={styles.sectionHeading}>
+        <View style={[styles.sectionHeading, styles.achievementHeading]}>
           <Text style={styles.sectionTitle}>Mga Nakamit</Text>
           <Text style={styles.sectionHint}>Makakuha ng mga sagisag habang nag-aaral</Text>
         </View>
@@ -267,6 +275,17 @@ export default function ProfileScreen() {
               onChangeText={(value) => { setName(value); setError(''); }}
               returnKeyType="next"
             />
+            <Text style={styles.inputLabel}>Palayaw / Pangalan sa App</Text>
+            <TextInput
+              accessibilityLabel="Palayaw / Pangalan sa App"
+              autoCapitalize="words"
+              placeholder="Ilagay ang palayaw"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+              value={nickname}
+              onChangeText={(value) => { setNickname(value); setError(''); }}
+              returnKeyType="next"
+            />
             <Text style={styles.inputLabel}>Adres ng email</Text>
             <TextInput
               accessibilityLabel="Adres ng email"
@@ -340,6 +359,7 @@ const styles = StyleSheet.create({
   levelPill: { alignSelf: 'flex-start', borderRadius: radius.pill, backgroundColor: colors.primary, paddingHorizontal: spacing.sm, paddingVertical: 5 },
   levelText: { color: colors.onPrimary, fontSize: 11, fontWeight: '600' },
   sectionHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: spacing.xs },
+  achievementHeading: { flexDirection: 'column', alignItems: 'flex-start', gap: 4, marginBottom: 12 },
   sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700' },
   sectionHint: { color: colors.muted, fontSize: 12 },
   badgesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

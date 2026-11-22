@@ -1,6 +1,31 @@
-import { useEffect, useRef, useState, type ComponentType, type Ref } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import WebView, { type WebViewMessageEvent } from 'react-native-webview';
+import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system/legacy';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
+import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import { FINGERSPELLING_LETTERS } from '../data/fingerspelling';
+
+// Metro requires static asset references so these files are bundled offline.
+/* eslint-disable @typescript-eslint/no-require-imports */
+const MODEL_ASSETS = [
+  require('../../assets/models/vision_bundle.bin'),
+  require('../../assets/models/vision_wasm_internal.js.bin'),
+  require('../../assets/models/vision_wasm_internal.wasm.bin'),
+  require('../../assets/models/hand_landmarker.task.bin'),
+  require('../../assets/models/LICENSE.txt'),
+];
+/* eslint-enable @typescript-eslint/no-require-imports */
+
+const MODEL_FILENAMES = [
+  'vision_bundle.js',
+  'vision_wasm_internal.js',
+  'vision_wasm_internal.wasm',
+  'hand_landmarker.task',
+  'LICENSE.txt',
+] as const;
+
+const MODEL_CACHE_VERSION = 'mediapipe-hand-landmarker-1.2.3-v1';
+const HOLD_DURATION_MS = 1200;
 
 export type DetectorStatus = 'loading' | 'ready' | 'error';
 
@@ -9,526 +34,535 @@ export type DetectorProgress = {
   confidence: number;
   holdProgress: number;
   detected: boolean;
-  faceVisible: boolean;
+  message: string;
 };
 
 type Props = {
   targetSignId: string;
   onProgress: (progress: DetectorProgress) => void;
   onVerified: (signId: string) => void;
-  onStatusChange: (status: DetectorStatus, message?: string) => void;
+  onStatusChange?: (status: DetectorStatus, message?: string) => void;
 };
 
-const MEDIAPIPE_VERSION = '1.2.3';
-const MEDIAPIPE_ROOT = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}`;
-const HAND_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
-const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
-
-type EmbeddedWebViewProps = {
-  ref?: Ref<WebView>;
-  source: { html: string; baseUrl: string };
-  originWhitelist: string[];
-  onMessage: (event: WebViewMessageEvent) => void;
-  onError: () => void;
-  onHttpError: () => void;
-  javaScriptEnabled: boolean;
-  mediaPlaybackRequiresUserAction: boolean;
-  mediaCapturePermissionGrantType: 'grant';
-  allowsInlineMediaPlayback: boolean;
-  scrollEnabled: boolean;
-  bounces: boolean;
-  style: StyleProp<ViewStyle>;
-  containerStyle: StyleProp<ViewStyle>;
+type WebViewSource = {
+  uri: string;
+  baseUrl: string;
 };
 
-const EmbeddedWebView = WebView as unknown as ComponentType<EmbeddedWebViewProps>;
+function buildDetectorHtml(targetSignId: string, modelDirectory: string) {
+  const letterDefinitions = FINGERSPELLING_LETTERS.map(
+    ({ letter, fingers, thumb, orientation, motion }) => ({
+      letter,
+      fingers,
+      thumb,
+      orientation,
+      motion,
+    }),
+  );
 
-function detectorHtml(targetSignId: string) {
-  return `<!DOCTYPE html>
-<html lang="tl">
+  return `<!doctype html>
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https: blob:; worker-src 'self' blob:; connect-src 'self' https: blob: data:; img-src 'self' data: blob: https:; media-src 'self' blob:; style-src 'self' 'unsafe-inline' https:;" />
-  <style>
-    * { box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #172b2a; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-    #stage { position: absolute; inset: 0; overflow: hidden; }
-    #camera, #skeleton { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-    #skeleton { pointer-events: none; }
-    #message { position: absolute; left: 16px; right: 16px; top: 45%; color: white; text-align: center; font-size: 13px; line-height: 19px; text-shadow: 0 1px 5px #000; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: blob:; script-src 'self' file: 'unsafe-inline' 'wasm-unsafe-eval'; connect-src 'self' file: blob:; img-src 'self' data: file:; media-src 'self' blob: file:; worker-src 'self' blob: file:">
+  <style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}video{width:1px;height:1px;opacity:0}</style>
 </head>
 <body>
-  <div id="stage">
-    <video id="camera" autoplay playsinline muted></video>
-    <canvas id="skeleton"></canvas>
-    <div id="message">Inihahanda ang kamera at pagkilala sa senyas…</div>
-  </div>
-  <script type="module">
-    import { FilesetResolver, HandLandmarker, FaceLandmarker } from '${MEDIAPIPE_ROOT}/vision_bundle.mjs';
-
+  <video id="camera" autoplay muted playsinline></video>
+  <script>
+    const MODEL_DIRECTORY = ${JSON.stringify(modelDirectory)};
+    const INITIAL_TARGET = ${JSON.stringify(targetSignId)};
+    const LETTERS = ${JSON.stringify(letterDefinitions)};
+    const HOLD_DURATION = ${HOLD_DURATION_MS};
     const video = document.getElementById('camera');
-    const canvas = document.getElementById('skeleton');
-    const context = canvas.getContext('2d');
-    const message = document.getElementById('message');
-    let targetSignId = ${JSON.stringify(targetSignId)};
-    let handLandmarker = null;
-    let faceLandmarker = null;
-    let stream = null;
-    let lastVideoTime = -1;
-    let lastInferenceTime = 0;
-    let lastMessageTime = 0;
-    let holdStarted = 0;
-    let heldSignId = null;
-    let verified = false;
+    let activeTarget = INITIAL_TARGET;
+    let landmarker = null;
+    let cameraStream = null;
+    let holdStartedAt = null;
+    let verifiedTarget = null;
+    let motionSeenAt = null;
     let history = [];
-    let motionSeenUntil = 0;
-    let inferenceErrorReported = false;
-    let animationFrame = 0;
+    let frameRequest = null;
+    let lastSentAt = 0;
+    let stopped = false;
 
-    const HAND_CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
-    const SIGN_NAMES = {
-      '1': 'Kumusta',
-      '2': 'Salamat',
-      '3': 'Magandang Umaga',
-      '4': 'Paalam',
-      '5': 'Ingat',
-      '6': 'Nanay',
-      '7': 'Tatay',
-      '8': 'Isa',
-      '9': 'Dalawa',
-    };
-
-    function post(data) {
-      window.ReactNativeWebView?.postMessage(JSON.stringify(data));
+    function post(message) {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(message));
+      }
     }
 
-    function clamp(value, min = 0, max = 1) {
-      return Math.max(min, Math.min(max, value));
+    function resetHold() {
+      holdStartedAt = null;
+      verifiedTarget = null;
+    }
+
+    function motionReady(seen, duration = 4000) {
+      if (seen) motionSeenAt = performance.now();
+      return motionSeenAt !== null && performance.now() - motionSeenAt < duration;
+    }
+
+    function sendProgress(confidence, holdProgress, detected, message) {
+      const now = performance.now();
+      if (now - lastSentAt < 60 && holdProgress < 1) return;
+      lastSentAt = now;
+      post({
+        type: 'progress',
+        signId: activeTarget,
+        confidence: Math.round(confidence * 100),
+        holdProgress: Math.max(0, Math.min(holdProgress, 1)),
+        detected,
+        message,
+      });
+    }
+
+    function clamp(value) {
+      return Math.max(0, Math.min(1, value));
     }
 
     function distance(a, b) {
-      return Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0));
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      return Math.sqrt(dx * dx + dy * dy);
     }
 
     function angle(a, b, c) {
-      const first = { x: a.x - b.x, y: a.y - b.y, z: (a.z || 0) - (b.z || 0) };
-      const second = { x: c.x - b.x, y: c.y - b.y, z: (c.z || 0) - (b.z || 0) };
-      const denominator = Math.hypot(first.x, first.y, first.z) * Math.hypot(second.x, second.y, second.z);
+      const abx = a.x - b.x;
+      const aby = a.y - b.y;
+      const cbx = c.x - b.x;
+      const cby = c.y - b.y;
+      const denominator = Math.sqrt((abx * abx + aby * aby) * (cbx * cbx + cby * cby));
       if (!denominator) return 0;
-      const dot = first.x * second.x + first.y * second.y + first.z * second.z;
-      return Math.acos(clamp(dot / denominator, -1, 1)) * 180 / Math.PI;
+      const cosine = Math.max(-1, Math.min(1, (abx * cbx + aby * cby) / denominator));
+      return Math.acos(cosine) * 180 / Math.PI;
     }
 
-    function midpoint(a, b) {
-      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: ((a.z || 0) + (b.z || 0)) / 2 };
+    function rangeScore(value, minimum, maximum) {
+      if (value >= minimum && value <= maximum) return 1;
+      const distanceFromRange = value < minimum ? minimum - value : value - maximum;
+      return clamp(1 - distanceFromRange / Math.max(maximum - minimum, 1));
+    }
+
+    function orientation(a, b, c) {
+      return (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
+    }
+
+    function segmentsIntersect(a, b, c, d) {
+      const abC = orientation(a, b, c);
+      const abD = orientation(a, b, d);
+      const cdA = orientation(c, d, a);
+      const cdB = orientation(c, d, b);
+      return abC * abD < 0 && cdA * cdB < 0;
     }
 
     function handFeatures(hand) {
-      const chains = [[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]];
-      const scale = Math.max(distance(hand[0], hand[9]), 0.001);
-      const straightness = chains.map(([mcp, pip, dip, tip]) => {
-        const pipAngle = angle(hand[mcp], hand[pip], hand[dip]);
+      const wrist = hand[0];
+      const palmScale = Math.max(distance(wrist, hand[9]), 0.001);
+      const fingerBases = [5, 9, 13, 17];
+      const chains = [
+        [5, 6, 7, 8],
+        [9, 10, 11, 12],
+        [13, 14, 15, 16],
+        [17, 18, 19, 20],
+      ];
+      const fingers = chains.map((chain) => {
+        const [base, pip, dip, tip] = chain;
+        const pipAngle = angle(hand[base], hand[pip], hand[tip]);
         const dipAngle = angle(hand[pip], hand[dip], hand[tip]);
-        const reach = distance(hand[tip], hand[0]) / Math.max(distance(hand[pip], hand[0]), 0.001);
-        return clamp((pipAngle - 108) / 62) * 0.55 + clamp((dipAngle - 108) / 62) * 0.25 + clamp((reach - 0.96) / 0.48) * 0.2;
+        const reach = distance(wrist, hand[tip]) / palmScale;
+        const extended = clamp((pipAngle - 110) / 70) * 0.58
+          + clamp((reach - 1.0) / 0.85) * 0.42;
+        const curved = rangeScore(pipAngle, 115, 155) * 0.45
+          + rangeScore(dipAngle, 105, 155) * 0.35
+          + rangeScore(reach, 1.05, 1.75) * 0.2;
+        const hooked = rangeScore(pipAngle, 65, 125) * 0.6
+          + clamp((dipAngle - 120) / 55) * 0.4;
+        return {
+          extended,
+          curled: 1 - extended,
+          curved,
+          hooked,
+        };
       });
-      const thumbAngle = angle(hand[2], hand[3], hand[4]);
-      const thumbReach = distance(hand[4], hand[0]) / Math.max(distance(hand[2], hand[0]), 0.001);
-      const thumb = clamp((thumbAngle - 98) / 72) * 0.7 + clamp((thumbReach - 0.9) / 0.58) * 0.3;
-      const palm = {
+
+      const thumbTip = hand[4];
+      const palmCenter = {
         x: (hand[0].x + hand[5].x + hand[9].x + hand[13].x + hand[17].x) / 5,
         y: (hand[0].y + hand[5].y + hand[9].y + hand[13].y + hand[17].y) / 5,
-        z: (hand[0].z + hand[5].z + hand[9].z + hand[13].z + hand[17].z) / 5,
       };
+      const thumbReach = distance(thumbTip, wrist) / palmScale;
+      const indexMiddleDistance = distance(hand[8], hand[12]) / palmScale;
+      const betweenCenter = {
+        x: (hand[6].x + hand[10].x) / 2,
+        y: (hand[6].y + hand[10].y) / 2,
+      };
+      const acrossCenter = {
+        x: (hand[6].x + hand[9].x) / 2,
+        y: (hand[6].y + hand[9].y) / 2,
+      };
+      const underThreeCenter = {
+        x: (hand[13].x + hand[17].x) / 2,
+        y: (hand[13].y + hand[17].y) / 2,
+      };
+      const underTwoCenter = {
+        x: (hand[9].x + hand[13].x) / 2,
+        y: (hand[9].y + hand[13].y) / 2,
+      };
+      const thumbScores = {
+        side: clamp((thumbReach - 0.55) / 0.85) * 0.7
+          + clamp(1 - distance(thumbTip, hand[5]) / (palmScale * 1.1)) * 0.3,
+        folded: clamp(1 - Math.abs(thumbReach - 0.72) / 0.7) * 0.55
+          + clamp(1 - distance(thumbTip, palmCenter) / (palmScale * 0.85)) * 0.45,
+        circle: clamp(1 - distance(thumbTip, hand[8]) / (palmScale * 0.55)),
+        across: clamp(1 - distance(thumbTip, acrossCenter) / (palmScale * 0.7)),
+        tucked: clamp(1 - distance(thumbTip, palmCenter) / (palmScale * 0.65)),
+        between: clamp(1 - distance(thumbTip, betweenCenter) / (palmScale * 0.65)),
+        'under-three': clamp(1 - distance(thumbTip, underThreeCenter) / (palmScale * 0.8)),
+        'under-two': clamp(1 - distance(thumbTip, underTwoCenter) / (palmScale * 0.8)),
+      };
+      const palmDirectionX = hand[9].x - wrist.x;
+      const palmDirectionY = hand[9].y - wrist.y;
+      const handOrientation = Math.abs(palmDirectionX) > Math.abs(palmDirectionY)
+        ? 'side'
+        : palmDirectionY < 0 ? 'up' : 'down';
+      const spread = indexMiddleDistance;
+      const crossed = segmentsIntersect(hand[5], hand[8], hand[9], hand[12]) ? 1 : 0;
+      const center = {
+        x: fingerBases.reduce((sum, index) => sum + hand[index].x, 0) / fingerBases.length,
+        y: fingerBases.reduce((sum, index) => sum + hand[index].y, 0) / fingerBases.length,
+      };
+
       return {
-        scale,
-        palm,
-        straightness,
-        thumb,
-        indexMiddleSpread: distance(hand[8], hand[12]) / scale,
-        thumbTip: hand[4],
+        fingers,
+        thumbScores,
+        palmScale,
+        handOrientation,
+        spread,
+        crossed,
+        center,
       };
     }
 
-    function faceFeatures(landmarks) {
-      if (!landmarks?.length) return null;
-      const points = landmarks[0];
-      const forehead = points[10];
-      const chin = points[152];
-      const leftTemple = points[234];
-      const rightTemple = points[454];
-      const mouth = midpoint(points[13], points[14]);
-      const width = Math.max(distance(leftTemple, rightTemple), 0.001);
-      const height = Math.max(distance(forehead, chin), 0.001);
-      return { forehead, chin, leftTemple, rightTemple, mouth, width, height };
+    function isInGuide(features) {
+      return features.center.x >= 0.12 && features.center.x <= 0.88
+        && features.center.y >= 0.1 && features.center.y <= 0.88;
     }
 
-    function extendedScore(features, indices) {
-      return indices.reduce((sum, index) => sum + features.straightness[index], 0) / indices.length;
-    }
+    function scoreLetter(letter, features) {
+      const definition = LETTERS.find((item) => item.letter === letter);
+      if (!definition) return 0;
+      const fingerScores = definition.fingers.map((shape, index) => (
+        shape === 'crossed' ? features.crossed : features.fingers[index][shape]
+      ));
+      const fingerAverage = fingerScores.reduce((sum, score) => sum + score, 0) / fingerScores.length;
+      const fingerMinimum = Math.min(...fingerScores);
+      const thumbScore = features.thumbScores[definition.thumb] || 0;
+      let score = fingerAverage * 0.68 + thumbScore * 0.24;
+      const requiredScore = 0.76;
 
-    function openHandScore(features) {
-      return extendedScore(features, [0, 1, 2, 3]) * 0.82 + features.thumb * 0.18;
-    }
-
-    function flatHandScore(features) {
-      return Math.min(...features.straightness) * 0.78 + features.thumb * 0.22;
-    }
-
-    function oneFingerScore(features) {
-      const [index, middle, ring, pinky] = features.straightness;
-      return index * (1 - middle) * (1 - ring) * (1 - pinky);
-    }
-
-    function twoFingerScore(features) {
-      const [index, middle, ring, pinky] = features.straightness;
-      const fingers = index * middle * (1 - ring) * (1 - pinky);
-      const vShape = clamp((features.indexMiddleSpread - 0.08) / 0.2);
-      return fingers * (0.65 + vShape * 0.35);
-    }
-
-    function handSpan(hand) {
-      return Math.max(distance(hand[0], hand[9]), 0.001);
-    }
-
-    function recentMotion(test) {
-      const now = performance.now();
-      const recent = history.filter((point) => now - point.time < 1700);
-      if (recent.length < 3) return false;
-      return test(recent, recent[0], recent[recent.length - 1]);
-    }
-
-    function hasWave() {
-      return recentMotion((points, first, last) => {
-        const xs = points.map((point) => point.palm.x);
-        const range = Math.max(...xs) - Math.min(...xs);
-        let reversals = 0;
-        let previousDirection = 0;
-        for (let index = 1; index < xs.length; index += 1) {
-          const delta = xs[index] - xs[index - 1];
-          if (Math.abs(delta) < 0.012) continue;
-          const direction = Math.sign(delta);
-          if (previousDirection && direction !== previousDirection) reversals += 1;
-          previousDirection = direction;
-        }
-        return range > 0.13 && reversals >= 1 && Math.abs(last.palm.y - first.palm.y) < 0.22;
-      });
-    }
-
-    function near(point, target, threshold) {
-      return distance(point, target) < threshold;
-    }
-
-    function scoreSign(signId, handLandmarks, face) {
-      const signName = SIGN_NAMES[signId];
-      if (!signName) return { confidence: 0, matches: false, faceVisible: false };
-      if (!handLandmarks.length) {
-        const faceNeeded = ['Kumusta', 'Salamat', 'Magandang Umaga', 'Paalam', 'Ingat', 'Nanay', 'Tatay'].includes(signName);
-        return { confidence: 0, matches: false, faceVisible: !faceNeeded || Boolean(face) };
+      if (definition.orientation) {
+        score = score * 0.85 + (features.handOrientation === definition.orientation ? 0.15 : 0);
       }
-      const hands = handLandmarks;
+      if (letter === 'U') {
+        score = score * 0.8 + clamp(1 - features.spread / 0.55) * 0.2;
+      } else if (letter === 'V' || letter === 'K') {
+        score = score * 0.8 + clamp((features.spread - 0.08) / 0.5) * 0.2;
+      }
+
+      if (fingerMinimum < 0.52 || thumbScore < 0.45) return 0;
+      if (score < requiredScore) return 0;
+      if (definition.motion && !motionReady(hasMotion(definition.motion))) return 0;
+      return score;
+    }
+
+    function scoreSign(signId, features, handCount) {
+      const extended = features.fingers.map((finger) => finger.extended);
+      const openPalm = extended.every((value) => value > 0.52);
+      const indexOnly = extended[0] > 0.62 && extended.slice(1).every((value) => value < 0.5);
+      const twoFingers = extended[0] > 0.58 && extended[1] > 0.58
+        && extended[2] < 0.5 && extended[3] < 0.5;
+      const recent = history.filter((sample) => performance.now() - sample.time < 1400);
+      const verticalRange = recent.length
+        ? Math.max(...recent.map((sample) => sample.center.y))
+          - Math.min(...recent.map((sample) => sample.center.y))
+        : 0;
+      const horizontalRange = recent.length
+        ? Math.max(...recent.map((sample) => sample.center.x))
+          - Math.min(...recent.map((sample) => sample.center.x))
+        : 0;
+      const movingOutward = recent.length >= 5
+        && (horizontalRange > 0.08
+          || Math.abs(recent[recent.length - 1].palmScale - recent[0].palmScale) > 0.14);
+      const movingUpward = recent.length >= 5
+        && recent[0].center.y - recent[recent.length - 1].center.y > 0.06;
+      const waving = hasMotion('wave');
+      const handY = features.center.y;
+
+      switch (signId) {
+        case '1':
+          return openPalm && handY <= 0.52 && motionReady(waving) ? 1 : 0;
+        case '2':
+          return openPalm && handY >= 0.2 && handY <= 0.68 && motionReady(movingOutward) ? 1 : 0;
+        case '3':
+          return openPalm && handY < 0.68 && motionReady(movingUpward) ? 1 : 0;
+        case '4':
+          return openPalm && handY >= 0.38 && motionReady(waving) ? 1 : 0;
+        case '5':
+          return handCount > 1 && (openPalm || (twoFingers && features.spread > 0.12)) ? 1 : 0;
+        case '6':
+          return openPalm && features.thumbScores.side > 0.45 && handY >= 0.38 && handY <= 0.66 ? 1 : 0;
+        case '7':
+          return openPalm && features.thumbScores.side > 0.45 && handY >= 0.1 && handY <= 0.39 ? 1 : 0;
+        case '8':
+          return indexOnly ? 1 : 0;
+        case '9':
+          return twoFingers && features.spread > 0.12 ? 1 : 0;
+        default:
+          return 0;
+      }
+    }
+
+    function hasMotion(kind) {
+      const recent = history.filter((sample) => performance.now() - sample.time < 1400);
+      if (recent.length < 5) return false;
+      if (kind === 'wave') {
+        const values = recent.map((sample) => sample.center.x);
+        let directionChanges = 0;
+        let previousDirection = 0;
+        for (let index = 1; index < values.length; index += 1) {
+          const delta = values[index] - values[index - 1];
+          const direction = Math.abs(delta) > 0.008 ? Math.sign(delta) : 0;
+          if (direction && previousDirection && direction !== previousDirection) directionChanges += 1;
+          if (direction) previousDirection = direction;
+        }
+        return Math.max(...values) - Math.min(...values) > 0.09 && directionChanges >= 2;
+      }
+      const xValues = recent.map((sample) => sample.indexTip.x);
+      const yValues = recent.map((sample) => sample.indexTip.y);
+      const xRange = Math.max(...xValues) - Math.min(...xValues);
+      const yRange = Math.max(...yValues) - Math.min(...yValues);
+      if (kind === 'J') {
+        const pinkyYs = recent.map((sample) => sample.pinkyTip.y);
+        const pinkyXs = recent.map((sample) => sample.pinkyTip.x);
+        return Math.max(...pinkyYs) - Math.min(...pinkyYs) > 0.12
+          && Math.max(...pinkyXs) - Math.min(...pinkyXs) > 0.035;
+      }
+      let directionChanges = 0;
+      let previousDirection = 0;
+      for (let index = 1; index < xValues.length; index += 1) {
+        const delta = xValues[index] - xValues[index - 1];
+        const direction = Math.abs(delta) > 0.008 ? Math.sign(delta) : 0;
+        if (direction && previousDirection && direction !== previousDirection) directionChanges += 1;
+        if (direction) previousDirection = direction;
+      }
+      return xRange > 0.12 && yRange > 0.035 && directionChanges >= 1;
+    }
+
+    function evaluateTarget(hand, handCount) {
+      const features = handFeatures(hand);
+      if (!isInGuide(features)) {
+        return { detected: false, matched: false, confidence: 0, message: 'Itapat ang iyong kamay sa loob ng gabay.' };
+      }
+      const letterMatch = activeTarget.match(/^letter:([A-Z]):/);
+      if (letterMatch) {
+        const confidence = scoreLetter(letterMatch[1], features);
+        return confidence
+          ? { detected: true, matched: true, confidence, message: 'Panatilihin ang hugis ng kamay.' }
+          : {
+              detected: true,
+              matched: false,
+              confidence: 0,
+              message: 'Itama ang hugis ng kamay para sa letrang ' + letterMatch[1] + '...',
+            };
+      }
+      const confidence = scoreSign(activeTarget, features, handCount);
+      const signNames = {
+        '1': 'Kumusta',
+        '2': 'Salamat',
+        '3': 'Magandang Umaga',
+        '4': 'Paalam',
+        '5': 'Ingat',
+        '6': 'Nanay',
+        '7': 'Tatay',
+        '8': 'Isa',
+        '9': 'Dalawa',
+      };
+      return confidence
+        ? { detected: true, matched: true, confidence, message: 'Panatilihin ang hugis at galaw ng senyas.' }
+        : {
+            detected: true,
+            matched: false,
+            confidence: 0,
+            message: 'Itama ang hugis ng kamay para sa senyas na ' + (signNames[activeTarget] || activeTarget) + '...',
+          };
+    }
+
+    function frameLoop() {
+      if (stopped || !landmarker || video.readyState < 2) {
+        frameRequest = requestAnimationFrame(frameLoop);
+        return;
+      }
+      const now = performance.now();
+      let result;
+      try {
+        result = landmarker.detectForVideo(video, now);
+      } catch (error) {
+        const rawMessage = String(error && error.message ? error.message : error);
+        post({
+          type: 'error',
+          message: /fetch/i.test(rawMessage)
+            ? 'Hindi gumana ang lokal na pagkilala sa kamay. Subukang isara at buksan muli ang pagsasanay.'
+            : rawMessage,
+        });
+        stopped = true;
+        return;
+      }
+      const hands = result && result.landmarks ? result.landmarks : [];
+      if (!hands.length) {
+        history = [];
+        motionSeenAt = null;
+        resetHold();
+        sendProgress(0, 0, false, 'Walang nakitang kamay — itapat ang iyong kamay sa loob ng gabay');
+        frameRequest = requestAnimationFrame(frameLoop);
+        return;
+      }
+
       const hand = hands[0];
       const features = handFeatures(hand);
-      const needsFace = ['Kumusta', 'Salamat', 'Magandang Umaga', 'Paalam', 'Ingat', 'Nanay', 'Tatay'].includes(signName);
-      if (needsFace && !face) return { confidence: 0, matches: false, faceVisible: false };
-
-      const faceScale = face?.width || features.scale * 3;
-      const atChest = face
-        ? features.palm.y > face.chin.y + face.height * 0.05
-          && features.palm.y < face.chin.y + face.height * 1.1
-        : features.palm.y > 0.48 && features.palm.y < 0.82;
-      let confidence = 0;
-      let matches = false;
-
-      if (signName === 'Kumusta') {
-        const priorNearTemple = history.some((point) => face && (
-          near(point.palm, face.leftTemple, face.width * 0.44)
-          || near(point.palm, face.rightTemple, face.width * 0.44)
-        ));
-        const outward = recentMotion((points, first, last) => {
-          const startDistance = Math.min(distance(first.palm, face.leftTemple), distance(first.palm, face.rightTemple));
-          const endDistance = Math.min(distance(last.palm, face.leftTemple), distance(last.palm, face.rightTemple));
-          return startDistance < face.width * 0.48
-            && endDistance > startDistance + face.width * 0.1
-            && last.palm.y < face.chin.y;
-        });
-        if (priorNearTemple && outward) motionSeenUntil = performance.now() + 1500;
-        const pose = openHandScore(features);
-        confidence = pose * 0.68 + (performance.now() < motionSeenUntil ? 0.32 : 0);
-        matches = pose > 0.48 && performance.now() < motionSeenUntil;
-      } else if (signName === 'Salamat') {
-        const startedAtMouth = history.some((point) => face && near(point.palm, face.mouth, face.width * 0.48));
-        const movedForwardOrDown = recentMotion((points, first, last) => {
-          const approachedCamera = last.scale > first.scale * 1.12 || last.palm.z < first.palm.z - 0.035;
-          const movedDown = last.palm.y > first.palm.y + 0.055;
-          return startedAtMouth && (approachedCamera || movedDown);
-        });
-        if (movedForwardOrDown) motionSeenUntil = performance.now() + 1500;
-        const pose = flatHandScore(features);
-        confidence = pose * 0.67 + (performance.now() < motionSeenUntil ? 0.33 : 0);
-        matches = pose > 0.58 && performance.now() < motionSeenUntil;
-      } else if (signName === 'Magandang Umaga') {
-        const startedAtChin = history.some((point) => face && near(point.palm, face.chin, face.width * 0.48));
-        const outwardLift = recentMotion((points, first, last) => {
-          const outward = Math.abs(last.palm.x - first.palm.x) > face.width * 0.14
-            || last.scale > first.scale * 1.1
-            || last.palm.z < first.palm.z - 0.035;
-          const lifted = last.palm.y < first.palm.y + 0.08;
-          return startedAtChin && outward && lifted;
-        });
-        if (outwardLift) motionSeenUntil = performance.now() + 1500;
-        const pose = flatHandScore(features);
-        confidence = pose * 0.65 + (performance.now() < motionSeenUntil ? 0.35 : 0);
-        matches = pose > 0.55 && performance.now() < motionSeenUntil;
-      } else if (signName === 'Paalam') {
-        const raised = features.palm.y < face.chin.y + face.height * 0.15;
-        const wave = hasWave();
-        if (wave) motionSeenUntil = performance.now() + 1500;
-        const pose = openHandScore(features);
-        confidence = pose * 0.55 + (raised ? 0.15 : 0) + (performance.now() < motionSeenUntil ? 0.3 : 0);
-        matches = pose > 0.48 && raised && performance.now() < motionSeenUntil;
-      } else if (signName === 'Ingat') {
-        const bothHands = handLandmarks.length >= 2;
-        const otherPalm = bothHands ? handFeatures(handLandmarks[1]).palm : null;
-        const stackedHands = Boolean(otherPalm && atChest
-          && distance(features.palm, otherPalm) < faceScale * 0.72
-          && Math.abs(features.palm.y - otherPalm.y) > features.scale * 0.04);
-        const kOrV = features.straightness[0] > 0.55
-          && features.straightness[1] > 0.5
-          && features.straightness[2] < 0.55
-          && features.straightness[3] < 0.55;
-        const tap = recentMotion((points) => {
-          const ys = points.map((point) => point.palm.y);
-          return Math.max(...ys) - Math.min(...ys) > features.scale * 0.13;
-        });
-        if (stackedHands || (kOrV && atChest && tap)) motionSeenUntil = performance.now() + 1300;
-        const shape = stackedHands ? 0.85 : kOrV ? 0.72 : openHandScore(features);
-        confidence = shape * 0.55 + (atChest ? 0.15 : 0) + (performance.now() < motionSeenUntil ? 0.3 : 0);
-        matches = atChest && (stackedHands || (kOrV && performance.now() < motionSeenUntil));
-      } else if (signName === 'Nanay' || signName === 'Tatay') {
-        const target = signName === 'Nanay' ? face.chin : face.forehead;
-        const thumbAtTarget = near(features.thumbTip, target, face.width * 0.28);
-        if (thumbAtTarget) motionSeenUntil = performance.now() + 1400;
-        const fingersOpen = extendedScore(features, [0, 1, 2, 3]);
-        confidence = fingersOpen * 0.64 + (thumbAtTarget ? 0.36 : performance.now() < motionSeenUntil ? 0.28 : 0);
-        matches = fingersOpen > 0.48 && performance.now() < motionSeenUntil;
-      } else if (signName === 'Isa') {
-        confidence = oneFingerScore(features);
-        matches = features.straightness[0] > 0.65
-          && features.straightness.slice(1).every((value) => value < 0.52);
-      } else if (signName === 'Dalawa') {
-        confidence = twoFingerScore(features);
-        matches = features.straightness[0] > 0.6
-          && features.straightness[1] > 0.6
-          && features.straightness[2] < 0.55
-          && features.straightness[3] < 0.55
-          && features.indexMiddleSpread > 0.13;
-      }
-
-      return {
-        confidence: clamp(confidence),
-        matches: Boolean(matches && confidence >= 0.7),
-        faceVisible: true,
+      const sample = {
+        time: now,
+        center: features.center,
+        palmScale: features.palmScale,
+        indexTip: hand[8],
+        pinkyTip: hand[20],
       };
-    }
-
-    function drawHands(hands) {
-      const width = video.videoWidth;
-      const height = video.videoHeight;
-      if (!width || !height) return;
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
+      history.push(sample);
+      history = history.filter((item) => now - item.time < 1600);
+      const evaluation = evaluateTarget(hand, hands.length);
+      if (!evaluation.detected) {
+        motionSeenAt = null;
+        resetHold();
+        sendProgress(0, 0, false, evaluation.message);
+        frameRequest = requestAnimationFrame(frameLoop);
+        return;
       }
-      context.clearRect(0, 0, width, height);
-      context.lineWidth = Math.max(3, width * 0.006);
-      context.lineCap = 'round';
-      context.strokeStyle = '#5eead4';
-      context.fillStyle = '#d1fae5';
-      context.shadowColor = '#34d399';
-      context.shadowBlur = 7;
-      for (const landmarks of hands) {
-        for (const [start, end] of HAND_CONNECTIONS) {
-          context.beginPath();
-          context.moveTo(landmarks[start].x * width, landmarks[start].y * height);
-          context.lineTo(landmarks[end].x * width, landmarks[end].y * height);
-          context.stroke();
-        }
-        for (const point of landmarks) {
-          context.beginPath();
-          context.arc(point.x * width, point.y * height, Math.max(2.5, width * 0.006), 0, Math.PI * 2);
-          context.fill();
-        }
+      if (!evaluation.matched) {
+        resetHold();
+        sendProgress(0, 0, true, evaluation.message);
+        frameRequest = requestAnimationFrame(frameLoop);
+        return;
       }
-      context.shadowBlur = 0;
-    }
 
-    function sendProgress(confidence, holdProgress, detected, faceVisible) {
-      const now = performance.now();
-      if (now - lastMessageTime < 90 && holdProgress < 1) return;
-      lastMessageTime = now;
-      post({ type: 'progress', signId: targetSignId, confidence: Math.round(confidence * 100), holdProgress, detected, faceVisible });
-    }
-
-    function renderLoop() {
-      if (video.readyState >= 2
-        && video.currentTime !== lastVideoTime
-        && performance.now() - lastInferenceTime >= 50
-        && handLandmarker
-        && faceLandmarker) {
-        lastVideoTime = video.currentTime;
-        lastInferenceTime = performance.now();
-        try {
-          const timestamp = performance.now();
-          const handResult = handLandmarker.detectForVideo(video, timestamp);
-          const faceResult = faceLandmarker.detectForVideo(video, timestamp);
-          const hands = handResult.landmarks || [];
-          const face = faceFeatures(faceResult.faceLandmarks);
-          drawHands(hands);
-          const primaryHand = hands[0];
-          if (primaryHand) {
-            const features = handFeatures(primaryHand);
-            history.push({ palm: features.palm, scale: features.scale, time: timestamp });
-            history = history.filter((point) => timestamp - point.time <= 1800);
-          } else {
-            history = [];
-            motionSeenUntil = 0;
-          }
-
-          const result = scoreSign(targetSignId, hands, face);
-          inferenceErrorReported = false;
-          if (result.matches && !verified) {
-            if (heldSignId !== targetSignId) {
-              heldSignId = targetSignId;
-              holdStarted = timestamp;
-            }
-            const holdProgress = clamp((timestamp - holdStarted) / 1200);
-            sendProgress(result.confidence, holdProgress, true, result.faceVisible);
-            if (holdProgress >= 1) {
-              verified = true;
-              post({ type: 'verified', signId: targetSignId });
-            }
-          } else {
-            heldSignId = null;
-            holdStarted = 0;
-            sendProgress(result.confidence, 0, result.confidence >= 0.4, result.faceVisible);
-          }
-        } catch (error) {
-          if (!inferenceErrorReported) {
-            const reason = error instanceof Error ? error.message : 'Hindi mabasa ang galaw ng kamay.';
-            post({ type: 'status', status: 'error', message: reason });
-            inferenceErrorReported = true;
-          }
-        }
+      if (holdStartedAt === null) holdStartedAt = now;
+      const holdProgress = Math.min((now - holdStartedAt) / HOLD_DURATION, 1);
+      sendProgress(evaluation.confidence, holdProgress, true, evaluation.message);
+      if (holdProgress >= 1 && verifiedTarget !== activeTarget) {
+        verifiedTarget = activeTarget;
+        post({ type: 'verified', signId: activeTarget });
       }
-      animationFrame = requestAnimationFrame(renderLoop);
-    }
-
-    window.setTargetSign = (signId) => {
-      targetSignId = SIGN_NAMES[String(signId)] ? String(signId) : '1';
-      heldSignId = null;
-      holdStarted = 0;
-      verified = false;
-      history = [];
-      motionSeenUntil = 0;
-      sendProgress(0, 0, false, false);
-    };
-
-    function receiveTarget(event) {
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (data?.type === 'target') window.setTargetSign(data.signId);
-      } catch {
-        post({ type: 'status', status: 'error', message: 'Hindi mabasa ang kasalukuyang target na senyas.' });
-      }
-    }
-
-    window.addEventListener('message', receiveTarget);
-    document.addEventListener('message', receiveTarget);
-
-    async function createTask(Task, vision, modelAssetPath, options) {
-      try {
-        return await Task.createFromOptions(vision, {
-          baseOptions: { modelAssetPath, delegate: 'GPU' },
-          ...options,
-        });
-      } catch {
-        return Task.createFromOptions(vision, {
-          baseOptions: { modelAssetPath, delegate: 'CPU' },
-          ...options,
-        });
-      }
+      frameRequest = requestAnimationFrame(frameLoop);
     }
 
     async function start() {
       try {
-        post({ type: 'status', status: 'loading', message: 'Inihahanda ang pagkilala sa senyas…' });
-        const vision = await FilesetResolver.forVisionTasks('${MEDIAPIPE_ROOT}/wasm');
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        if (!window.isSecureContext && location.protocol !== 'file:') {
+          throw new Error('Hindi ligtas ang lokal na konteksto para sa kamera.');
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Hindi magamit ang kamera sa web view na ito.');
+        }
+        cameraStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
         });
-        video.srcObject = stream;
+        video.srcObject = cameraStream;
         await video.play();
 
-        [handLandmarker, faceLandmarker] = await Promise.all([
-          createTask(HandLandmarker, vision, '${HAND_MODEL}', {
-            runningMode: 'VIDEO',
-            numHands: 2,
-            minHandDetectionConfidence: 0.55,
-            minHandPresenceConfidence: 0.55,
-            minTrackingConfidence: 0.5,
-          }),
-          createTask(FaceLandmarker, vision, '${FACE_MODEL}', {
-            runningMode: 'VIDEO',
-            numFaces: 1,
-            minFaceDetectionConfidence: 0.5,
-            minFacePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-            outputFaceBlendshapes: false,
-          }),
-        ]);
-        message.style.display = 'none';
+        const vision = window.Vision;
+        if (!vision || !vision.FilesetResolver || !vision.HandLandmarker) {
+          throw new Error('Hindi makita ang nakabundle na MediaPipe runtime.');
+        }
+        const fileset = await vision.FilesetResolver.forVisionTasks(MODEL_DIRECTORY, false);
+        landmarker = await vision.HandLandmarker.createFromOptions(fileset, {
+          baseOptions: {
+            modelAssetPath: MODEL_DIRECTORY + 'hand_landmarker.task',
+            delegate: 'CPU',
+          },
+          runningMode: 'VIDEO',
+          numHands: 2,
+          minHandDetectionConfidence: 0.55,
+          minHandPresenceConfidence: 0.55,
+          minTrackingConfidence: 0.5,
+        });
         post({ type: 'status', status: 'ready' });
-        animationFrame = requestAnimationFrame(renderLoop);
+        frameRequest = requestAnimationFrame(frameLoop);
       } catch (error) {
-        stream?.getTracks().forEach((track) => track.stop());
-        video.srcObject = null;
-        handLandmarker?.close();
-        faceLandmarker?.close();
-        const reason = error?.name === 'NotAllowedError'
-          ? 'Hindi pinayagan ang camera. Tiyaking naka-on ang pahintulot sa kamera.'
-          : error?.message || 'Hindi masimulan ang camera o pagkilala. Suriin ang koneksiyon at subukang muli.';
-        message.textContent = reason;
-        post({ type: 'status', status: 'error', message: reason });
+        const rawMessage = String(error && error.message ? error.message : error);
+        const message = /fetch/i.test(rawMessage)
+          ? 'Hindi ma-load ang nakabundle na pagkilala sa kamay. Subukang isara at buksan muli ang pagsasanay.'
+          : rawMessage;
+        post({ type: 'error', message });
       }
     }
 
-    window.addEventListener('pagehide', () => {
-      cancelAnimationFrame(animationFrame);
-      stream?.getTracks().forEach((track) => track.stop());
-      handLandmarker?.close();
-      faceLandmarker?.close();
+    window.setTargetSign = function (nextTarget) {
+      if (nextTarget === activeTarget) return;
+      activeTarget = nextTarget;
+      history = [];
+      motionSeenAt = null;
+      resetHold();
+      sendProgress(0, 0, false, 'Walang nakitang kamay — itapat ang iyong kamay sa loob ng gabay');
+    };
+
+    window.addEventListener('pagehide', function () {
+      stopped = true;
+      if (frameRequest !== null) cancelAnimationFrame(frameRequest);
+      if (landmarker) landmarker.close();
+      if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
     });
 
-    start();
+    const visionScript = document.createElement('script');
+    visionScript.src = MODEL_DIRECTORY + 'vision_bundle.js';
+    visionScript.onload = start;
+    visionScript.onerror = function () {
+      post({ type: 'error', message: 'Hindi mabasa ang lokal na MediaPipe runtime.' });
+    };
+    document.head.appendChild(visionScript);
   </script>
 </body>
 </html>`;
 }
 
-type DetectorMessage = {
-  type?: string;
-  status?: DetectorStatus;
-  message?: string;
-  signId?: string;
-  confidence?: number;
-  holdProgress?: number;
-  detected?: boolean;
-  faceVisible?: boolean;
-};
+async function prepareModelFiles() {
+  const cacheDirectory = FileSystem.cacheDirectory;
+  if (!cacheDirectory) {
+    throw new Error('Walang lokal na cache directory para sa pagkilala sa kamay.');
+  }
+
+  const modelDirectory = `${cacheDirectory}${MODEL_CACHE_VERSION}/`;
+  const directoryInfo = await FileSystem.getInfoAsync(modelDirectory);
+  if (!directoryInfo.exists) {
+    await FileSystem.makeDirectoryAsync(modelDirectory, { intermediates: true });
+  }
+
+  const assets = await Asset.loadAsync(MODEL_ASSETS);
+  if (assets.length !== MODEL_FILENAMES.length) {
+    throw new Error('Hindi kumpleto ang mga lokal na file ng pagkilala sa kamay.');
+  }
+
+  await Promise.all(assets.map(async (asset, index) => {
+    if (!asset.localUri) {
+      throw new Error(`Hindi maihanda ang lokal na file na ${MODEL_FILENAMES[index]}.`);
+    }
+    const destination = `${modelDirectory}${MODEL_FILENAMES[index]}`;
+    const destinationInfo = await FileSystem.getInfoAsync(destination);
+    if (!destinationInfo.exists) {
+      await FileSystem.copyAsync({ from: asset.localUri, to: destination });
+    }
+  }));
+
+  return modelDirectory;
+}
 
 export default function SignGestureDetector({
   targetSignId,
@@ -536,78 +570,139 @@ export default function SignGestureDetector({
   onVerified,
   onStatusChange,
 }: Props) {
-  const webViewRef = useRef<WebView>(null);
-  const readyRef = useRef(false);
-  const [source] = useState(() => ({
-    html: detectorHtml(targetSignId),
-    baseUrl: 'https://localhost/',
-  }));
+  const [source, setSource] = useState<WebViewSource | null>(null);
+  const webViewRef = useRef<WebView<object>>(null);
+  const isMountedRef = useRef(true);
+  const isReadyRef = useRef(false);
+  const targetRef = useRef(targetSignId);
+  const callbacksRef = useRef({ onProgress, onVerified, onStatusChange });
 
   useEffect(() => {
-    if (readyRef.current) {
-      webViewRef.current?.injectJavaScript(
-        `window.setTargetSign(${JSON.stringify(targetSignId)}); true;`,
-      );
-    }
+    callbacksRef.current = { onProgress, onVerified, onStatusChange };
+  }, [onProgress, onStatusChange, onVerified]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    callbacksRef.current.onStatusChange?.('loading', 'Inihahanda ang lokal na pagkilala sa kamay...');
+    void prepareModelFiles()
+      .then(async (modelDirectory) => {
+        if (!isMountedRef.current) return;
+        const htmlUri = `${modelDirectory}detector.html`;
+        await FileSystem.writeAsStringAsync(
+          htmlUri,
+          buildDetectorHtml(targetRef.current, modelDirectory),
+        );
+        if (!isMountedRef.current) return;
+        setSource({
+          uri: htmlUri,
+          baseUrl: modelDirectory,
+        });
+      })
+      .catch((error: unknown) => {
+        if (!isMountedRef.current) return;
+        const message = error instanceof Error ? error.message : 'Hindi naihanda ang lokal na pagkilala sa kamay.';
+        callbacksRef.current.onStatusChange?.('error', message);
+      });
+
+    return () => {
+      isMountedRef.current = false;
+      isReadyRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    targetRef.current = targetSignId;
+    if (!isReadyRef.current) return;
+    const target = JSON.stringify(targetSignId);
+    webViewRef.current?.injectJavaScript(`window.setTargetSign(${target}); true;`);
   }, [targetSignId]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
-    let message: DetectorMessage;
+    let message: {
+      type?: string;
+      status?: DetectorStatus;
+      signId?: string;
+      confidence?: number;
+      holdProgress?: number;
+      detected?: boolean;
+      message?: string;
+    };
     try {
-      message = JSON.parse(event.nativeEvent.data) as DetectorMessage;
-    } catch {
-      onStatusChange('error', 'May hindi inaasahang tugon mula sa pagkilala sa senyas.');
+      message = JSON.parse(event.nativeEvent.data) as typeof message;
+    } catch (error) {
+      callbacksRef.current.onStatusChange?.('error', `Hindi mabasa ang tugon ng lokal na pagkilala: ${String(error)}`);
       return;
     }
 
-    if (message.type === 'status' && message.status) {
-      if (message.status === 'ready') readyRef.current = true;
-      onStatusChange(message.status, message.message);
-    } else if (message.type === 'progress' && message.signId) {
-      onProgress({
+    if (message.type === 'status' && message.status === 'ready') {
+      isReadyRef.current = true;
+      callbacksRef.current.onStatusChange?.('ready');
+      const target = JSON.stringify(targetRef.current);
+      webViewRef.current?.injectJavaScript(`window.setTargetSign(${target}); true;`);
+      return;
+    }
+    if (message.type === 'error') {
+      callbacksRef.current.onStatusChange?.('error', message.message ?? 'Hindi gumana ang lokal na pagkilala sa kamay.');
+      return;
+    }
+    if (message.type === 'progress' && message.signId) {
+      callbacksRef.current.onProgress({
         signId: message.signId,
         confidence: message.confidence ?? 0,
         holdProgress: message.holdProgress ?? 0,
         detected: message.detected ?? false,
-        faceVisible: message.faceVisible ?? false,
+        message: message.message ?? '',
       });
-    } else if (message.type === 'verified' && message.signId) {
-      onVerified(message.signId);
+      return;
+    }
+    if (message.type === 'verified' && message.signId) {
+      callbacksRef.current.onVerified(message.signId);
     }
   };
 
+  const handleWebViewError = (event: { nativeEvent: { description?: string } }) => {
+    const description = event.nativeEvent.description;
+    callbacksRef.current.onStatusChange?.('error', description
+      ? `Hindi mabuksan ang lokal na pagkilala sa kamay: ${/fetch/i.test(description) ? 'hindi ma-access ang nakabundle na modelo' : description}`
+      : 'Hindi mabuksan ang lokal na pagkilala sa kamay.');
+  };
+
   return (
-    <View style={styles.container}>
-      <EmbeddedWebView
-        ref={webViewRef}
-        source={source}
-        originWhitelist={['https://localhost/*']}
-        onMessage={handleMessage}
-        onError={() => onStatusChange('error', 'Hindi ma-load ang camera preview. Subukang muli o laktawan ang senyas.')}
-        onHttpError={() => onStatusChange('error', 'Hindi ma-download ang mga file para sa pagkilala. Suriin ang koneksiyon o laktawan ang senyas.')}
-        javaScriptEnabled
-        mediaPlaybackRequiresUserAction={false}
-        mediaCapturePermissionGrantType="grant"
-        allowsInlineMediaPlayback
-        scrollEnabled={false}
-        bounces={false}
-        style={styles.webView}
-        containerStyle={styles.webViewContainer}
-      />
+    <View pointerEvents="none" style={styles.hidden}>
+      {source ? (
+        <WebView<object>
+          ref={webViewRef}
+          source={source}
+          originWhitelist={['file://*']}
+          javaScriptEnabled
+          domStorageEnabled
+          mediaPlaybackRequiresUserAction={false}
+          allowsInlineMediaPlayback
+          allowFileAccess
+          allowFileAccessFromFileURLs
+          allowUniversalAccessFromFileURLs={false}
+          allowingReadAccessToURL={source.baseUrl}
+          {...(Platform.OS === 'ios' ? { mediaCapturePermissionGrantType: 'grant' as const } : {})}
+          onMessage={handleMessage}
+          onError={handleWebViewError}
+          onHttpError={handleWebViewError}
+          mixedContentMode="never"
+          style={styles.webView}
+          {...(Platform.OS === 'android' ? { androidLayerType: 'software' as const } : {})}
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  hidden: {
     position: 'absolute',
     top: 0,
     left: 0,
     width: 1,
     height: 1,
     opacity: 0,
-    overflow: 'hidden',
   },
-  webViewContainer: { width: 1, height: 1, backgroundColor: 'transparent' },
   webView: { width: 1, height: 1, backgroundColor: 'transparent' },
 });

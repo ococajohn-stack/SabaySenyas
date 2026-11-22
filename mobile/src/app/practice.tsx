@@ -17,19 +17,17 @@ import { colors, MIN_TOUCH, radius, spacing } from '../theme';
 const HOLD_RING_SIZE = 48;
 const HOLD_RING_RADIUS = 19;
 const HOLD_RING_CIRCUMFERENCE = 2 * Math.PI * HOLD_RING_RADIUS;
-const FALLBACK_HOLD_DURATION = 1200;
 
 const emptyProgress = (signId: string): DetectorProgress => ({
   signId,
   confidence: 0,
   holdProgress: 0,
   detected: false,
-  faceVisible: false,
+  message: 'Walang nakitang kamay — itapat ang iyong kamay sa loob ng gabay',
 });
 
 export default function PracticeScreen() {
   const router = useRouter();
-  const isWebPlatform = Platform.OS === 'web';
   const { markSignLearned } = useLearningState();
   const { triggerHapticFeedback } = useSettingsState();
   const [permission, requestPermission] = useCameraPermissions();
@@ -40,11 +38,8 @@ export default function PracticeScreen() {
   const [detectorStatus, setDetectorStatus] = useState<DetectorStatus>('loading');
   const [detectorMessage, setDetectorMessage] = useState('');
   const [detectorProgress, setDetectorProgress] = useState(() => emptyProgress(SIGNS[0].id));
-  const [fallbackHoldProgress, setFallbackHoldProgress] = useState(0);
   const verifiedSignRef = useRef<string | null>(null);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fallbackHoldTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const fallbackHoldStartedRef = useRef<number | null>(null);
   const currentSign = SIGNS[signIndex];
   const currentProgress = detectorProgress.signId === currentSign.id
     ? detectorProgress
@@ -57,19 +52,9 @@ export default function PracticeScreen() {
   useEffect(
     () => () => {
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-      if (fallbackHoldTimerRef.current) clearInterval(fallbackHoldTimerRef.current);
     },
     [],
   );
-
-  useEffect(() => {
-    if (detectorStatus !== 'loading' || completed) return;
-    const timeout = setTimeout(() => {
-      setDetectorStatus('error');
-      setDetectorMessage('Mabagal magsimula ang awtomatikong pagkilala. Maaari mong gamitin ang kumpirmasyon sa ibaba.');
-    }, 15_000);
-    return () => clearTimeout(timeout);
-  }, [completed, detectorStatus]);
 
   const advanceSign = (index: number) => {
     verifiedSignRef.current = null;
@@ -103,10 +88,6 @@ export default function PracticeScreen() {
 
   const restartPractice = () => {
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-    if (fallbackHoldTimerRef.current) clearInterval(fallbackHoldTimerRef.current);
-    fallbackHoldTimerRef.current = null;
-    fallbackHoldStartedRef.current = null;
-    setFallbackHoldProgress(0);
     verifiedSignRef.current = null;
     setSignIndex(0);
     setScore(0);
@@ -115,28 +96,6 @@ export default function PracticeScreen() {
     setDetectorStatus('loading');
     setDetectorMessage('');
     setCompleted(false);
-  };
-
-  const stopFallbackHold = () => {
-    if (fallbackHoldTimerRef.current) clearInterval(fallbackHoldTimerRef.current);
-    fallbackHoldTimerRef.current = null;
-    fallbackHoldStartedRef.current = null;
-    setFallbackHoldProgress(0);
-  };
-
-  const startFallbackHold = () => {
-    if (detectorStatus !== 'error' || fallbackHoldTimerRef.current) return;
-    fallbackHoldStartedRef.current = Date.now();
-    fallbackHoldTimerRef.current = setInterval(() => {
-      const startedAt = fallbackHoldStartedRef.current;
-      if (startedAt === null) return;
-      const progress = Math.min((Date.now() - startedAt) / FALLBACK_HOLD_DURATION, 1);
-      setFallbackHoldProgress(progress);
-      if (progress === 1) {
-        stopFallbackHold();
-        handleVerified(currentSign.id);
-      }
-    }, 50);
   };
 
   return (
@@ -171,7 +130,7 @@ export default function PracticeScreen() {
                 {score === 0
                   ? 'Subukan Muli! Wala pang tamang senyas'
                   : score === SIGNS.length
-                    ? 'Mahusay! Perpektong Iskor!'
+                    ? 'Mahusay! Natapos ang lahat ng pagsubok.'
                     : 'Magandang Simula! Tapos na ang Pagsasanay'}
               </Text>
               <Text style={styles.completionSubtitle}>
@@ -204,7 +163,7 @@ export default function PracticeScreen() {
               <View style={styles.headingCopy}>
                 <Text style={styles.eyebrow}>INTERAKTIBONG PAGSASANAY</Text>
                 <Text style={styles.title}>Sanayin ang mga Senyas</Text>
-                <Text style={styles.meaning}>Ipakita ang bawat senyas sa kamera upang awtomatikong magpatuloy.</Text>
+                <Text style={styles.meaning}>Ilagay sa gabay ang kamay na ginagamit sa bawat senyas at panatilihin ito upang magpatuloy.</Text>
               </View>
               <Text style={styles.score}>Iskor: {score} / {SIGNS.length}</Text>
             </View>
@@ -299,51 +258,29 @@ export default function PracticeScreen() {
                       </View>
                       <View style={styles.detectorCopy}>
                         {correctBadge ? (
-                          <Text style={styles.correctBadge}>Tama! ✅</Text>
+                          <Text style={styles.correctBadge}>Napanatili ang kamay! ✅</Text>
                         ) : detectorStatus === 'error' ? (
                           <Text style={styles.detectorText}>{detectorMessage}</Text>
-                        ) : detectorStatus === 'ready' && signIndex < 7 && !currentProgress.faceVisible ? (
-                          <Text style={styles.detectorText}>Ipakita ang iyong mukha at kamay sa frame.</Text>
                         ) : currentProgress.holdProgress > 0 ? (
                           <Text style={styles.detectorText}>
-                            Pinapanatili ang senyas... {Math.round(currentProgress.holdProgress * 100)}%
-                          </Text>
-                        ) : currentProgress.detected ? (
-                          <Text style={styles.detectorText}>
-                            Nasusuri ang senyas... {currentProgress.confidence}%
+                            Pinapanatili ang kamay sa gabay... {Math.round(currentProgress.holdProgress * 100)}%
                           </Text>
                         ) : (
                           <Text style={styles.detectorText}>
-                            {detectorStatus === 'loading' ? 'Inihahanda ang pagkilala...' : 'Ipakita ang senyas sa kamera...'}
+                            {detectorStatus === 'loading'
+                              ? 'Inihahanda ang pagkilala...'
+                              : currentProgress.message}
                           </Text>
                         )}
-                        {detectorStatus === 'ready' && !correctBadge ? (
-                          <Text style={styles.confidenceText}>Tiwala: {currentProgress.confidence}%</Text>
-                        ) : null}
                       </View>
                     </View>
                   </View>
                 ) : null}
               </View>
-              {permission?.granted && !isWebPlatform && detectorStatus === 'error' ? (
-                <Pressable
-                  style={styles.fallbackButton}
-                  onPressIn={startFallbackHold}
-                  onPressOut={stopFallbackHold}
-                  accessibilityRole="button"
-                  accessibilityLabel="Hawakan upang kumpirmahing naipakita ang senyas"
-                >
-                  <Text style={styles.fallbackButtonText}>
-                    {fallbackHoldProgress > 0
-                      ? `Hawakan upang kumpirmahin... ${Math.round(fallbackHoldProgress * 100)}%`
-                      : 'Hawakan upang kumpirmahin ang senyas'}
-                  </Text>
-                </Pressable>
-              ) : null}
             </View>
 
             <Text style={styles.footerNote}>
-              Awtomatikong sinusuri ng kamera ang iyong senyas upang magpatuloy.
+              Awtomatikong sinusuri ng kamera ang hugis at galaw ng iyong kamay para sa senyas.
             </Text>
 
             <Pressable
@@ -413,14 +350,11 @@ const styles = StyleSheet.create({
   ringLabel: { position: 'absolute', color: '#fff', fontSize: 11, fontWeight: '700' },
   detectorCopy: { flex: 1, gap: 3 },
   detectorText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  confidenceText: { color: '#CBD5E1', fontSize: 11 },
   correctBadge: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.pill, color: '#fff', backgroundColor: '#15803D', fontSize: 13, fontWeight: '700' },
   footerNote: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   skipButton: { minHeight: MIN_TOUCH, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md },
   skipText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
   body: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
-  fallbackButton: { minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.primary },
-  fallbackButtonText: { color: colors.onPrimary, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   completion: { flex: 1, justifyContent: 'center' },
   completionCard: {
     width: '100%',

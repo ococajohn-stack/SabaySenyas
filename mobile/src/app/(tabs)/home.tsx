@@ -29,7 +29,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.greeting}>
           <Text style={styles.eyebrow}>ESPASYO MO SA PAG-AARAL</Text>
-          <Text style={styles.title}>Kumusta, {user?.name ?? "Mag-aaral"}</Text>
+          <Text style={styles.title}>Kumusta, {user?.nickname ?? user?.name ?? "Mag-aaral"}</Text>
           <Text style={styles.subtitle}>
             Handa ka na bang magsanay ng FSL ngayong araw?
           </Text>

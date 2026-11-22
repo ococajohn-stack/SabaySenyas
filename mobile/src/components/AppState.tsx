@@ -28,13 +28,24 @@ type SettingsState = {
 
 export type UserProfile = {
   name: string;
+  nickname: string;
   email: string;
+  fslLevel: FslLevel;
+  dailyGoal: DailyGoal;
+};
+
+export type FslLevel = 'Baguhan' | 'May Kaalaman' | 'Sanay';
+export type DailyGoal = '5 min/araw' | '10 min/araw' | '15 min/araw';
+export type UserRegistrationDetails = {
+  nickname: string;
+  fslLevel: FslLevel;
+  dailyGoal: DailyGoal;
 };
 
 type UserState = {
   user: UserProfile | null;
   logIn: (email: string) => void;
-  updateProfile: (name: string, email: string) => void;
+  updateProfile: (name: string, email: string, details?: UserRegistrationDetails) => void;
   logOut: () => void;
 };
 
@@ -55,7 +66,7 @@ export function LearningProvider({ children }: { children: ReactNode }) {
   const [learnedSignIds, setLearnedSignIds] = useState<string[]>([]);
   const [streak, setStreak] = useState(0);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [accountNames, setAccountNames] = useState<Record<string, string>>({});
+  const [accountProfiles, setAccountProfiles] = useState<Record<string, UserProfile>>({});
   const [preferences, setPreferences] = useState<LearningPreferences>({
     subtitlesByDefault: true,
     hapticFeedback: false,
@@ -107,23 +118,39 @@ export function LearningProvider({ children }: { children: ReactNode }) {
     user,
     logIn: (email) => {
       const normalizedEmail = email.trim().toLowerCase();
-      setUser({
-        name: accountNames[normalizedEmail] ?? displayNameFromEmail(normalizedEmail),
+      setUser(accountProfiles[normalizedEmail] ?? {
+        name: displayNameFromEmail(normalizedEmail),
+        nickname: displayNameFromEmail(normalizedEmail),
         email: normalizedEmail,
+        fslLevel: 'Baguhan',
+        dailyGoal: '5 min/araw',
       });
     },
-    updateProfile: (name, email) => {
+    updateProfile: (name, email, details) => {
       const normalizedEmail = email.trim().toLowerCase();
       const normalizedName = name.trim();
-      setAccountNames((accounts) => {
-        const nextAccounts = { ...accounts, [normalizedEmail]: normalizedName };
+      setAccountProfiles((accounts) => {
+        const nextProfile: UserProfile = {
+          name: normalizedName,
+          nickname: details?.nickname.trim() || user?.nickname || normalizedName,
+          email: normalizedEmail,
+          fslLevel: details?.fslLevel ?? user?.fslLevel ?? 'Baguhan',
+          dailyGoal: details?.dailyGoal ?? user?.dailyGoal ?? '5 min/araw',
+        };
+        const nextAccounts = { ...accounts, [normalizedEmail]: nextProfile };
         if (user && user.email !== normalizedEmail) delete nextAccounts[user.email];
         return nextAccounts;
       });
-      setUser({ name: normalizedName, email: normalizedEmail });
+      setUser({
+        name: normalizedName,
+        nickname: details?.nickname.trim() || user?.nickname || normalizedName,
+        email: normalizedEmail,
+        fslLevel: details?.fslLevel ?? user?.fslLevel ?? 'Baguhan',
+        dailyGoal: details?.dailyGoal ?? user?.dailyGoal ?? '5 min/araw',
+      });
     },
     logOut: () => setUser(null),
-  }), [accountNames, user]);
+  }), [accountProfiles, user]);
 
   return (
     <SettingsContext.Provider value={settingsValue}>
