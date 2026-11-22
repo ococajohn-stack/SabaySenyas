@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
@@ -183,7 +183,6 @@ export default function LessonScreen() {
           <View style={styles.cameraFrame}>
             {permission?.granted && Platform.OS !== 'web' ? (
               <>
-                <CameraView facing="front" style={StyleSheet.absoluteFill} />
                 <SignGestureDetector
                   targetSignId={currentTarget}
                   onProgress={(nextProgress) => {

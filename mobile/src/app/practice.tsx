@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -195,7 +195,6 @@ export default function PracticeScreen() {
                     </View>
                   ) : (
                     <>
-                      <CameraView facing="front" style={StyleSheet.absoluteFill} />
                       <SignGestureDetector
                         targetSignId={currentSign.id}
                         onProgress={(progress) => {
