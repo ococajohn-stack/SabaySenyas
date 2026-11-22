@@ -4,27 +4,11 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Circle, G, Svg } from 'react-native-svg';
 import { useLearningState, useSettingsState } from '../components/AppState';
 import PrimaryButton from '../components/PrimaryButton';
-import SignGestureDetector, {
-  type DetectorProgress,
-  type DetectorStatus,
-} from '../components/SignGestureDetector';
+import SignGestureDetector from '../components/SignGestureDetector';
 import { SIGNS } from '../data/signs';
 import { colors, MIN_TOUCH, radius, spacing } from '../theme';
-
-const HOLD_RING_SIZE = 48;
-const HOLD_RING_RADIUS = 19;
-const HOLD_RING_CIRCUMFERENCE = 2 * Math.PI * HOLD_RING_RADIUS;
-
-const emptyProgress = (signId: string): DetectorProgress => ({
-  signId,
-  confidence: 0,
-  holdProgress: 0,
-  detected: false,
-  message: 'Walang nakitang kamay — itapat ang iyong kamay sa loob ng gabay',
-});
 
 export default function PracticeScreen() {
   const router = useRouter();
@@ -33,18 +17,10 @@ export default function PracticeScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [signIndex, setSignIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [correctBadge, setCorrectBadge] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [detectorStatus, setDetectorStatus] = useState<DetectorStatus>('loading');
-  const [detectorMessage, setDetectorMessage] = useState('');
-  const [detectorProgress, setDetectorProgress] = useState(() => emptyProgress(SIGNS[0].id));
   const verifiedSignRef = useRef<string | null>(null);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentSign = SIGNS[signIndex];
-  const currentProgress = detectorProgress.signId === currentSign.id
-    ? detectorProgress
-    : emptyProgress(currentSign.id);
-
   useEffect(() => {
     if (permission?.canAskAgain) void requestPermission();
   }, [permission?.canAskAgain, requestPermission]);
@@ -63,18 +39,15 @@ export default function PracticeScreen() {
       return;
     }
     setSignIndex(index + 1);
-    setDetectorProgress(emptyProgress(SIGNS[index + 1].id));
   };
 
   const handleVerified = (signId: string) => {
     if (signId !== currentSign.id || verifiedSignRef.current === signId) return;
     verifiedSignRef.current = signId;
-    setCorrectBadge(true);
     setScore((value) => value + 1);
     markSignLearned(signId);
     triggerHapticFeedback();
     advanceTimerRef.current = setTimeout(() => {
-      setCorrectBadge(false);
       advanceSign(signIndex);
     }, 1000);
   };
@@ -82,7 +55,6 @@ export default function PracticeScreen() {
   const skipSign = () => {
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
     verifiedSignRef.current = null;
-    setCorrectBadge(false);
     advanceSign(signIndex);
   };
 
@@ -91,10 +63,6 @@ export default function PracticeScreen() {
     verifiedSignRef.current = null;
     setSignIndex(0);
     setScore(0);
-    setCorrectBadge(false);
-    setDetectorProgress(emptyProgress(SIGNS[0].id));
-    setDetectorStatus('loading');
-    setDetectorMessage('');
     setCompleted(false);
   };
 
@@ -194,19 +162,10 @@ export default function PracticeScreen() {
                       <Text style={styles.permissionText}>Gumamit ng Android o iPhone para sa live na pagkilala sa kamay.</Text>
                     </View>
                   ) : (
-                    <>
-                      <SignGestureDetector
-                        targetSignId={currentSign.id}
-                        onProgress={(progress) => {
-                          if (progress.signId === currentSign.id) setDetectorProgress(progress);
-                        }}
-                        onVerified={handleVerified}
-                        onStatusChange={(status, message) => {
-                          setDetectorStatus(status);
-                          setDetectorMessage(message ?? '');
-                        }}
-                      />
-                    </>
+                    <SignGestureDetector
+                      targetSignId={currentSign.id}
+                      onVerified={handleVerified}
+                    />
                   )
                 ) : (
                   <View style={styles.permissionState}>
@@ -221,65 +180,11 @@ export default function PracticeScreen() {
                   </View>
                 )}
 
-                {permission?.granted && Platform.OS !== 'web' ? (
-                  <View pointerEvents="none" style={styles.cameraOverlay}>
-                    <View style={styles.alignmentFrame} />
-                    <View style={styles.detectorStatusPill}>
-                      <View
-                        style={styles.holdRing}
-                        accessibilityRole="progressbar"
-                        accessibilityValue={{ min: 0, max: 100, now: Math.round(currentProgress.holdProgress * 100) }}
-                      >
-                        <Svg width={HOLD_RING_SIZE} height={HOLD_RING_SIZE}>
-                          <G rotation={-90} origin={`${HOLD_RING_SIZE / 2}, ${HOLD_RING_SIZE / 2}`}>
-                            <Circle
-                              cx={HOLD_RING_SIZE / 2}
-                              cy={HOLD_RING_SIZE / 2}
-                              r={HOLD_RING_RADIUS}
-                              fill="none"
-                              stroke="rgba(255,255,255,0.28)"
-                              strokeWidth={4}
-                            />
-                            <Circle
-                              cx={HOLD_RING_SIZE / 2}
-                              cy={HOLD_RING_SIZE / 2}
-                              r={HOLD_RING_RADIUS}
-                              fill="none"
-                              stroke={correctBadge ? '#22C55E' : '#5EEAD4'}
-                              strokeWidth={4}
-                              strokeLinecap="round"
-                              strokeDasharray={HOLD_RING_CIRCUMFERENCE}
-                              strokeDashoffset={HOLD_RING_CIRCUMFERENCE * (1 - currentProgress.holdProgress)}
-                            />
-                          </G>
-                        </Svg>
-                        <Text style={styles.ringLabel}>{Math.round(currentProgress.holdProgress * 100)}%</Text>
-                      </View>
-                      <View style={styles.detectorCopy}>
-                        {correctBadge ? (
-                          <Text style={styles.correctBadge}>Napanatili ang kamay! ✅</Text>
-                        ) : detectorStatus === 'error' ? (
-                          <Text style={styles.detectorText}>{detectorMessage}</Text>
-                        ) : currentProgress.holdProgress > 0 ? (
-                          <Text style={styles.detectorText}>
-                            Pinapanatili ang kamay sa gabay... {Math.round(currentProgress.holdProgress * 100)}%
-                          </Text>
-                        ) : (
-                          <Text style={styles.detectorText}>
-                            {detectorStatus === 'loading'
-                              ? 'Inihahanda ang pagkilala...'
-                              : currentProgress.message}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                ) : null}
               </View>
             </View>
 
             <Text style={styles.footerNote}>
-              Awtomatikong sinusuri ng kamera ang hugis at galaw ng iyong kamay para sa senyas.
+              Ihambing ang kamay sa gabay, saka pindutin at panatilihin ang hugis upang kumpirmahin.
             </Text>
 
             <Pressable
@@ -330,26 +235,6 @@ const styles = StyleSheet.create({
   permissionState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
   permissionIcon: { width: 56, height: 56, borderRadius: radius.pill, backgroundColor: colors.chip, alignItems: 'center', justifyContent: 'center' },
   permissionText: { maxWidth: 280, color: colors.text, fontSize: 15, fontWeight: '600', lineHeight: 22, textAlign: 'center' },
-  cameraOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', padding: spacing.sm },
-  alignmentFrame: { width: '82%', height: '74%', borderWidth: 2, borderColor: 'rgba(255,255,255,0.62)', borderRadius: radius.md },
-  detectorStatusPill: {
-    position: 'absolute',
-    left: spacing.sm,
-    right: spacing.sm,
-    bottom: spacing.sm,
-    minHeight: 70,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(15, 23, 42, 0.78)',
-  },
-  holdRing: { width: HOLD_RING_SIZE, height: HOLD_RING_SIZE, alignItems: 'center', justifyContent: 'center' },
-  ringLabel: { position: 'absolute', color: '#fff', fontSize: 11, fontWeight: '700' },
-  detectorCopy: { flex: 1, gap: 3 },
-  detectorText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  correctBadge: { alignSelf: 'flex-start', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.pill, color: '#fff', backgroundColor: '#15803D', fontSize: 13, fontWeight: '700' },
   footerNote: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   skipButton: { minHeight: MIN_TOUCH, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md },
   skipText: { color: colors.primary, fontSize: 14, fontWeight: '700' },

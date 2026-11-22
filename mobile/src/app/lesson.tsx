@@ -5,13 +5,9 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Circle, G, Svg } from 'react-native-svg';
 import FingerspellingHand from '../components/FingerspellingHand';
 import PrimaryButton from '../components/PrimaryButton';
-import SignGestureDetector, {
-  type DetectorProgress,
-  type DetectorStatus,
-} from '../components/SignGestureDetector';
+import SignGestureDetector from '../components/SignGestureDetector';
 import SignVideo from '../components/SignVideo';
 import { FINGERSPELLING_LETTERS } from '../data/fingerspelling';
 import { SIGNS } from '../data/signs';
@@ -37,18 +33,6 @@ const LESSON_SIGN_IDS: Record<string, string> = {
   '4': '4',
 };
 
-const HOLD_RING_SIZE = 42;
-const HOLD_RING_RADIUS = 16;
-const HOLD_RING_CIRCUMFERENCE = 2 * Math.PI * HOLD_RING_RADIUS;
-
-const EMPTY_PROGRESS = (signId: string): DetectorProgress => ({
-  signId,
-  confidence: 0,
-  holdProgress: 0,
-  detected: false,
-  message: 'Walang nakitang kamay — itapat ang iyong kamay sa loob ng gabay',
-});
-
 export default function LessonScreen() {
   const router = useRouter();
   const { unit: unitParam } = useLocalSearchParams<{ unit?: string }>();
@@ -60,15 +44,11 @@ export default function LessonScreen() {
   const letters = lessonSign.title.toUpperCase().replace(/[^A-Z]/g, '').split('');
   const [permission, requestPermission] = useCameraPermissions();
   const [letterIndex, setLetterIndex] = useState(0);
-  const [detectorStatus, setDetectorStatus] = useState<DetectorStatus>('loading');
-  const [detectorMessage, setDetectorMessage] = useState('');
-  const [progress, setProgress] = useState(() => EMPTY_PROGRESS(`letter:${letters[0]}:0`));
   const [finished, setFinished] = useState(false);
   const verifiedTargetRef = useRef<string | null>(null);
   const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentLetter = letters[letterIndex];
   const currentTarget = `letter:${currentLetter}:${letterIndex}`;
-  const currentProgress = progress.signId === currentTarget ? progress : EMPTY_PROGRESS(currentTarget);
   const reference = FINGERSPELLING_LETTERS.find((item) => item.letter === currentLetter);
 
   useEffect(() => {
@@ -97,7 +77,6 @@ export default function LessonScreen() {
     const nextIndex = letterIndex + 1;
     setLetterIndex(nextIndex);
     verifiedTargetRef.current = null;
-    setProgress(EMPTY_PROGRESS(`letter:${letters[nextIndex]}:${nextIndex}`));
   };
 
   const handleVerified = (target: string) => {
@@ -182,63 +161,10 @@ export default function LessonScreen() {
           <Text style={styles.cardTitle}>Subukan sa harap ng kamera</Text>
           <View style={styles.cameraFrame}>
             {permission?.granted && Platform.OS !== 'web' ? (
-              <>
-                <SignGestureDetector
-                  targetSignId={currentTarget}
-                  onProgress={(nextProgress) => {
-                    if (nextProgress.signId === currentTarget) setProgress(nextProgress);
-                  }}
-                  onVerified={handleVerified}
-                  onStatusChange={(status, message) => {
-                    setDetectorStatus(status);
-                    setDetectorMessage(message ?? '');
-                  }}
-                />
-                <View pointerEvents="none" style={styles.alignmentFrame} />
-                <View pointerEvents="none" style={styles.cameraStatus}>
-                  <View
-                    style={styles.holdRing}
-                    accessibilityRole="progressbar"
-                    accessibilityValue={{ min: 0, max: 100, now: Math.round(currentProgress.holdProgress * 100) }}
-                  >
-                    <Svg width={HOLD_RING_SIZE} height={HOLD_RING_SIZE}>
-                      <G rotation={-90} origin={`${HOLD_RING_SIZE / 2}, ${HOLD_RING_SIZE / 2}`}>
-                        <Circle
-                          cx={HOLD_RING_SIZE / 2}
-                          cy={HOLD_RING_SIZE / 2}
-                          r={HOLD_RING_RADIUS}
-                          fill="none"
-                          stroke="rgba(255,255,255,0.28)"
-                          strokeWidth={4}
-                        />
-                        <Circle
-                          cx={HOLD_RING_SIZE / 2}
-                          cy={HOLD_RING_SIZE / 2}
-                          r={HOLD_RING_RADIUS}
-                          fill="none"
-                          stroke={finished ? '#22C55E' : '#5EEAD4'}
-                          strokeWidth={4}
-                          strokeLinecap="round"
-                          strokeDasharray={HOLD_RING_CIRCUMFERENCE}
-                          strokeDashoffset={HOLD_RING_CIRCUMFERENCE * (1 - currentProgress.holdProgress)}
-                        />
-                      </G>
-                    </Svg>
-                    <Text style={styles.ringLabel}>{Math.round(currentProgress.holdProgress * 100)}%</Text>
-                  </View>
-                  <Text style={styles.cameraStatusText}>
-                    {finished
-                      ? 'Tapos na!'
-                      : detectorStatus === 'error'
-                        ? detectorMessage
-                        : currentProgress.holdProgress > 0
-                          ? `Panatilihin ang kamay sa gabay... ${Math.round(currentProgress.holdProgress * 100)}%`
-                          : detectorStatus === 'loading'
-                            ? 'Inihahanda ang pagkilala...'
-                            : currentProgress.message}
-                  </Text>
-                </View>
-              </>
+              <SignGestureDetector
+                targetSignId={currentTarget}
+                onVerified={handleVerified}
+              />
             ) : (
               <View style={styles.permissionState}>
                 <Ionicons name="camera-outline" size={28} color={colors.primary} />
@@ -266,7 +192,7 @@ export default function LessonScreen() {
             <Ionicons name="chevron-forward" size={16} color={colors.primary} />
           </Pressable>
           <Text style={styles.detectorNote}>
-            Awtomatikong sinusuri ng kamera ang hugis ng iyong kamay para sa bawat letra.
+            Ihambing ang kamay sa halimbawang hugis, saka pindutin at panatilihin upang kumpirmahin.
           </Text>
         </View>
 
@@ -307,11 +233,6 @@ const styles = StyleSheet.create({
   referenceLabel: { color: colors.text, fontSize: 14, fontWeight: '700' },
   referenceCue: { color: colors.muted, fontSize: 13, lineHeight: 19 },
   cameraFrame: { height: 260, position: 'relative', overflow: 'hidden', borderRadius: radius.md, backgroundColor: colors.slate, alignItems: 'center', justifyContent: 'center' },
-  alignmentFrame: { position: 'absolute', width: '76%', height: '76%', borderWidth: 2, borderColor: 'rgba(255,255,255,0.62)', borderRadius: radius.md },
-  cameraStatus: { position: 'absolute', bottom: spacing.sm, left: spacing.sm, right: spacing.sm, minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.sm, backgroundColor: 'rgba(15, 23, 42, 0.78)', paddingHorizontal: spacing.sm },
-  holdRing: { width: HOLD_RING_SIZE, height: HOLD_RING_SIZE, alignItems: 'center', justifyContent: 'center' },
-  ringLabel: { position: 'absolute', color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
-  cameraStatusText: { flex: 1, color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
   permissionState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md },
   permissionText: { color: colors.text, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   skipButton: { minHeight: MIN_TOUCH, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md },
